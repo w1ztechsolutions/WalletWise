@@ -224,5 +224,13 @@ All records automatically include `id`, `created_date`, `updated_date`, and `cre
 - [ ] Run `drizzle-kit generate` and apply migrations (`--local` then `--remote`). **Partially done:** migrations are generated and `--local` is applied (`No migrations to apply!`). `--remote` requires a real D1 database ID.
 - [x] Seed default categories server-side on first signup. Idempotent `databaseHooks.user.create.after` in `src/lib/auth.ts`; a new user is verified to receive exactly 9 categories.
 - [x] Verify locally with `wrangler pages dev dist --compatibility-flag=nodejs_compat`. Verified end to end in a browser: signup → session cookie → reload → authenticated; sign out → gated view; two users see zero cross-user data; create transaction → Dashboard/Analytics update without reload; import duplicate → preview → Replace keeps row id / Skip omits.
-- [ ] Push to GitHub, connect Cloudflare Pages, set production bindings, and apply `wrangler secret put` for required secrets. **Blocked on Cloudflare access** — `wrangler.jsonc` still carries the placeholder `database_id: "local-walletwise-db"`.
+- [ ] Push to GitHub, connect Cloudflare Pages, set production bindings, and apply `wrangler secret put` for required secrets. **Partially unblocked:** `wrangler.jsonc` now carries the real production `database_id` (`e9d133d0-…`) and the correct `DB`/`STORAGE` binding names (see `BUG-006`); remaining work is the Pages connection plus `wrangler secret put` for `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` (`.dev.vars.example` documents all three).
+
+#### Phase 8: Environment-Aware Typed Error Contract
+- [x] `functions/lib/errors.ts` — `ApiError` (status + stable `code` + optional `details`), `handleUnexpectedError` (structured JSON log in every environment, sanitized envelope), `withErrorHandling` (per-handler wrapper), `isProduction` (fails closed: only exact `"development"` unlocks `details`). Rationale in `ADR-003`.
+- [x] `functions/_middleware.ts` — guards `context.next()` as the outermost net, mints a per-request `requestId` echoed into every log line, and returns the typed `401` envelope.
+- [x] `functions/lib/helpers.ts` — legacy `error(message, status)` delegates to `ApiError.fromStatus()`, so all existing call sites gain the `code` field without edits.
+- [x] Client mirror — `src/lib/api.ts` preserves status/code/`details` in `ApiError` and exports `useRetry()` (no retry on 4xx; network-level failures still retry); wired into all five data hooks. `src/lib/env.ts` + `vite.config.ts` `define` mirror the server's `ENVIRONMENT` marker as `__WW_ENVIRONMENT__`.
+- [x] `ENVIRONMENT` var: `"production"` default in `wrangler.jsonc`, overridden to `"development"` by `.dev.vars` (documented in `.dev.vars.example`).
+- [x] Verified: `npm run build` green; `wrangler pages dev` boots; signed-out `GET /api/transactions` returns `401 {"error":"Unauthorized","code":"UNAUTHORIZED"}`. WIP build-breakage documented in `BUG-007`.
 

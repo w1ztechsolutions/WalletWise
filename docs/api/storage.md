@@ -67,10 +67,34 @@ same S3 endpoint for consistency.
 Local dev: copy `.dev.vars.example` → `.dev.vars`. Production:
 `npx wrangler secret put R2_ACCOUNT_ID` (etc.).
 
-Browser `PUT` uploads are cross-origin, so apply the bucket CORS policy once:
+Browser `PUT` uploads are cross-origin, so apply the bucket CORS policy once
+(the file uses Wrangler's `rules` format; `DELETE` is required for the
+presigned object-removal path and any future browser-side deletes):
 
 ```bash
-npx wrangler r2 bucket cors-put walletwise-storage --file r2-cors.json
+npx wrangler r2 bucket cors set walletwise-storage --file r2-cors.json
+npx wrangler r2 bucket cors list walletwise-storage   # verify
 ```
 
-(Adjust `AllowedOrigins` in `r2-cors.json` to your final Pages domain.)
+`r2-cors.json` (Wrangler `rules` format — the R2 API / dashboard JSON
+shape, not the legacy PascalCase array):
+
+```json
+{
+  "rules": [
+    {
+      "allowed": {
+        "origins": ["http://localhost:5173", "http://127.0.0.1:5173",
+                    "http://localhost:8788", "http://127.0.0.1:8788",
+                    "https://*.pages.dev"],
+        "methods": ["GET", "PUT", "HEAD", "DELETE"],
+        "headers": ["*"]
+      },
+      "exposeHeaders": ["ETag"],
+      "maxAgeSeconds": 3600
+    }
+  ]
+}
+```
+
+(Adjust `origins` to your final Pages domain.)

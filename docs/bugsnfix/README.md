@@ -15,6 +15,8 @@ Each bug is documented in its own individual file following the naming pattern: 
 | BUG-003 | [BUG-003-pages-functions-and-better-auth-startup.md](./BUG-003-pages-functions-and-better-auth-startup.md) | High | ✅ Resolved | 2026-10-02 |
 | BUG-004 | [BUG-004-deprecated-workers-ai-model.md](./BUG-004-deprecated-workers-ai-model.md) | High | ✅ Resolved | 2026-10-02 |
 | BUG-005 | [BUG-005-dead-hooks-and-unwired-backend.md](./BUG-005-dead-hooks-and-unwired-backend.md) | High | ✅ Resolved | 2026-10-02 |
+| BUG-006 | [BUG-006-d1-binding-rename-regression.md](./BUG-006-d1-binding-rename-regression.md) | Critical | ✅ Resolved | 2026-10-02 |
+| BUG-007 | [BUG-007-error-contract-wip-build-break.md](./BUG-007-error-contract-wip-build-break.md) | High | ✅ Resolved | 2026-10-02 |
 
 ---
 
