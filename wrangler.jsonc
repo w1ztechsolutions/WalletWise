@@ -7,11 +7,16 @@
 		"nodejs_compat"
 	],
 	"vars": {
-		"R2_BUCKET_NAME": "walletwise-storage"
+		"R2_BUCKET_NAME": "walletwise-storage",
+		// Controls error verbosity in `functions/lib/errors.ts`. Only the exact
+		// string "development" unlocks `details` in HTTP responses; anything
+		// else (including a missing binding) is treated as production.
+		// Overridden to "development" by .dev.vars for `wrangler pages dev`.
+		"ENVIRONMENT": "production"
 	},
 	"d1_databases": [
 		{
-			"binding": "walletwise_db",
+			"binding": "DB",
 			"database_name": "walletwise-db",
 			"database_id": "e9d133d0-fe79-41b1-b5e9-0c7c379e2a4d",
 			"migrations_dir": "drizzle"
@@ -21,11 +26,6 @@
 		{
 			"binding": "STORAGE",
 			"bucket_name": "walletwise-storage"
-		},
-		{
-			"bucket_name": "walletwise-storage",
-			"binding": "walletwise_storage",
-			"remote": true
 		}
 	],
 	"ai": {
