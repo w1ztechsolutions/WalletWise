@@ -57,19 +57,14 @@ export const ToastContainer: React.FC = () => {
 interface ToastProps {
   id: string
   title: string
-  message: string
+  description: string
   type: 'success' | 'error' | 'info' | 'warning'
   onRemove: (id: string) => void
 }
 
-const Toast: React.FC<ToastProps> = ({ id, title, message, type, onRemove }) => {
+const Toast: React.FC<ToastProps> = ({ id, title, description, type, onRemove }) => {
   const Icon = TOAST_ICONS[type]
   const colors = TOAST_COLORS[type]
-
-  useEffect(() => {
-    const timer = setTimeout(() => onRemove(id), 5000)
-    return () => clearTimeout(timer)
-  }, [id, onRemove])
 
   return (
     <div
@@ -84,7 +79,7 @@ const Toast: React.FC<ToastProps> = ({ id, title, message, type, onRemove }) => 
       <Icon className="w-5 h-5 shrink-0 mt-0.5" style={{ color: colors.icon }} />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{title}</p>
-        <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>{message}</p>
+        <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>{description}</p>
       </div>
       <button
         onClick={() => onRemove(id)}

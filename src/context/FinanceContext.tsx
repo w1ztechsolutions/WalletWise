@@ -97,7 +97,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
     const saved = localStorage.getItem(storageKey('transactions'))
     if (saved) return JSON.parse(saved)
-    // Starter initial data so app has lively graphs for demonstration
+    if (!import.meta.env.DEV) return []
     const curMonth = getCurrentMonth()
     return [
       {
@@ -178,6 +178,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [budgets, setBudgets] = useState<Budget[]>(() => {
     const saved = localStorage.getItem(storageKey('budgets'))
     if (saved) return JSON.parse(saved)
+    if (!import.meta.env.DEV) return []
     const curMonth = getCurrentMonth()
     return [
       {
@@ -222,6 +223,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [accounts, setAccounts] = useState<Account[]>(() => {
     const saved = localStorage.getItem(storageKey('accounts'))
     if (saved) return JSON.parse(saved)
+    if (!import.meta.env.DEV) return []
     return [
       {
         id: 'acc-1',
