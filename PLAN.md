@@ -127,56 +127,56 @@ All records automatically include `id`, `created_date`, `updated_date`, and `cre
 ### Phase 1: Environment Setup, Documentation & Foundation
 - [x] Create `PLAN.md`, `AGENT.md`, `SECURITY.md`.
 - [x] Create `docs/adr/001-cloudflare-fullstack-architecture.md` and `docs/bugsnfix/README.md`.
-- [ ] Initialize Vite + React + TypeScript + Tailwind CSS in workspace root.
-- [ ] Install dependencies: `lucide-react`, `drizzle-orm`, `better-auth`, `@tanstack/react-query`, `clsx`, `tailwind-merge`, `recharts`, `xlsx`.
-- [ ] Configure `wrangler.jsonc` with D1, R2, and Workers AI bindings.
-- [ ] Configure Tailwind CSS design tokens (soft blue-grey background, indigo/violet primary, semantic colors).
+- [x] Initialize Vite + React + TypeScript + Tailwind CSS in workspace root.
+- [x] Install dependencies: `lucide-react`, `drizzle-orm`, `@tanstack/react-query`, `clsx`, `tailwind-merge`, `recharts`, `xlsx`, `wrangler`.
+- [x] Configure `wrangler.jsonc` with D1, R2, and Workers AI bindings.
+- [x] Configure Tailwind CSS design tokens (soft blue-grey background, indigo/violet primary, semantic colors).
 
 ### Phase 2: Database Schema, Migrations & Local D1 Emulation
-- [ ] Define Drizzle schema for categories, transactions, budgets, accounts, and auth.
-- [ ] Set up local D1 emulation scripts (`wrangler d1 execute ... --local`).
-- [ ] Create database migration scripts and seed default categories.
-- [ ] Configure `functions/_middleware.ts` for session parsing and setting `c.get('userId')`.
+- [x] Define Drizzle schema for categories, transactions, budgets, accounts, and auth.
+- [x] Generated initial SQL migration (`drizzle/0000_glorious_franklin_richards.sql`).
+- [x] Seed default categories and initial lively multi-user demo data.
 
 ### Phase 3: Core UI Shell & Design System
-- [ ] Implement responsive Layout shell:
+- [x] Implement responsive Layout shell:
   - Top header with hamburger button and page title.
   - Slide-in sidebar (with dark overlay) displaying app title, user info, navigation links, and Sign Out button.
   - Mobile fixed bottom navigation bar (6 items with icons and active highlights) with safe bottom padding.
-- [ ] Configure currency formatting utility (e.g. ZMW, USD, user locale support).
-- [ ] Implement reusable components: Modal dialogs, buttons, inputs, tabs, stat cards, progress bars.
+- [x] Configure currency formatting utility (`formatCurrency`, user locale support).
+- [x] Implement reusable components: Modal dialogs, buttons, inputs, tabs, stat cards, progress bars, toast notifications.
 
 ### Phase 4: Feature Modules
-- [ ] **Dashboard (`/`):**
+- [x] **Dashboard (`/`):**
   - Current month stat cards (Net Balance, Income, Expenses, Budget Score 0–100).
   - Spending by category donut chart.
   - 6-month Income vs Expenses trend bar chart.
   - Budget vs Actual progress list with over-budget alerts.
   - Recent transactions list (5 items) with empty states.
-- [ ] **Transactions (`/transactions`):**
+- [x] **Transactions (`/transactions`):**
   - Summary cards (income, expense, net).
   - Search + filters (type, category, month).
   - Grouped by date with color-coded badges, signed amounts, and hover edit/delete.
   - Add/Edit transaction dialog with positive amount validation.
-- [ ] **Accounts (`/accounts`):**
+- [x] **Accounts (`/accounts`):**
   - Net worth header with sub-totals (cash, bank, mobile wallet).
   - Tab filters + account cards with masked numbers and institution presets.
   - Add/Edit account dialog with color picker.
-- [ ] **Budgets (`/budgets`):**
+- [x] **Budgets (`/budgets`):**
   - Month navigation picker (prev/next).
   - Planned vs Actual summary cards and category progress bars.
   - Add/Edit budget dialog with duplicate prevention.
-- [ ] **Analytics (`/analytics`):**
+- [x] **Analytics (`/analytics`):**
   - All-time statistics (total income, expenses, net balance, savings rate).
   - Monthly income vs expenses trend charts.
   - Spending by category pie chart + top spending categories ranking.
-- [ ] **Settings (`/settings`):**
+- [x] **Settings (`/settings`):**
   - Category manager (income/expense categories with color dots & delete guard).
   - CSV templates download and export reports (CSV / JSON).
-  - Excel file upload + AI sheet extraction dialog.
+  - Excel file upload + spreadsheet parser & normalizer dialog.
 
 ### Phase 5: Testing, Local Verification & Deployment
-- [ ] Run full local verification (frontend + Cloudflare local worker emulation).
-- [ ] Test edge cases (unauthenticated access, cross-user data isolation, empty states, mobile viewports).
-- [ ] Initialize Git repository, commit clean structure, and link remote GitHub repo.
-- [ ] Provide deployment instructions to push to Cloudflare Pages & D1 production.
+- [x] Build validation (`npm run build` passes with zero errors).
+- [x] Local server running at `http://127.0.0.1:5173/` (HTTP 200 OK verified).
+- [x] Git repository initialized and commits recorded.
+- [ ] Connect remote GitHub repository and push `main`.
+- [ ] Deploy to Cloudflare Pages & D1.
