@@ -1,0 +1,137 @@
+# WalletWise â€” Complete App-Building Prompt
+
+Copy everything below this line into an AI app builder to recreate this app from scratch.
+
+---
+
+## 1. App Overview
+
+Build **WalletWise**, a personal finance management web app for tracking transactions, accounts, budgets, and analytics. The app is multi-user: every piece of data belongs strictly to the authenticated user who created it. Design it mobile-first and fully responsive (mobile bottom navigation, tablet layouts, desktop grid layouts). Tech stack: React + Tailwind CSS (JavaScript, Vite) with a backend-as-a-service platform providing authentication, a JSON-schema database, file storage, and AI integrations.
+
+## 2. Data Entities
+
+Create these entities (all records automatically carry id, created_date, updated_date, created_by_id):
+
+### Category
+- name (string, required) â€” category name
+- type (enum: income | expense, required)
+- color (string) â€” hex color code
+- icon (string) â€” icon name
+
+### Transaction
+- date (date, required)
+- amount (number, required, always positive)
+- description (string)
+- category_id (string, reference to Category)
+- category_name (string, cached for fast display)
+- type (enum: income | expense, required)
+- is_recurring (boolean, default false)
+- notes (string)
+
+### Budget
+- month (string YYYY-MM, required)
+- category_id (string, reference to Category)
+- category_name (string, cached)
+- planned_amount (number, required)
+- notes (string)
+
+### Account
+- name (string, required â€” e.g. "FNB Savings", "Airtel Money")
+- type (enum: cash | bank | mobile_wallet, required)
+- institution (string) â€” bank or wallet provider
+- account_number (string) â€” last 4 digits or reference only (never store full account numbers)
+- balance (number, required, default 0)
+- color (string) â€” hex color for the account card
+- notes (string)
+- is_active (boolean, default true)
+
+## 3. Security Requirements (implement all)
+
+1. **Authentication & session management** â€” use the platform's built-in authentication (email/password and social login). Never build custom auth, never store passwords or tokens in app code or localStorage.
+2. **Strict per-user data isolation** â€” every data fetch (transactions, budgets, categories, accounts) must filter by the authenticated user's identity (filter on the record's created_by field matching the current user's email/id). No page may ever list another user's records. React Query cache keys include the user identity so cached data never leaks between users.
+3. **Row-Level Security (RLS)** â€” configure RLS on every entity so that, at the database level, users can read, create, update, and delete ONLY their own records. Server-side enforcement, not just UI filtering. Only admins may manage user records.
+4. **No secrets in the frontend** â€” API keys, tokens, and credentials only in server-side environment secrets, never in client code, URLs, or entity fields.
+5. **Private file uploads** â€” any user-uploaded file (receipts, Excel imports) goes to private storage behind permissioned access, with signed, time-limited download URLs. Never public storage for user data.
+6. **Input validation & sanitization** â€” validate and sanitize all user input (amounts must be positive numbers, dates valid, IDs validated before use); user input is never inserted directly into queries (prevent injection).
+7. **Minimal data exposure** â€” store only the last 4 digits or a reference for account numbers; never full account or card numbers.
+8. **Server-side-only privileged operations** â€” anything that acts on behalf of other users (push notifications, bulk admin actions) must run server-side with the service role, never from the browser.
+9. **Error handling without information leaks** â€” show friendly generic errors in the UI; log full details server-side only.
+10. **Email hygiene** â€” emails sent from the app use the platform's email service; user-supplied text is never routed directly into recipient fields (anti-abuse protection).
+
+## 4. Pages & Features
+
+### Layout (all pages)
+- Top bar with hamburger menu button (all screen sizes) that opens a slide-in sidebar: app name "WalletWise" (text only, no logo image), current user's name and email, navigation links (Dashboard, Transactions, Accounts, Budgets, Analytics, Settings), and a Sign Out button.
+- **Mobile (below tablet breakpoint): fixed bottom navigation bar** with icon + label for the six sections, active item highlighted in the primary color; page content gets extra bottom padding so nothing is hidden behind the bar.
+- Slide-in sidebar with dark overlay backdrop; closes on navigation, overlay tap, or X button.
+
+### Dashboard (home, "/")
+- Month overview (current month): four stat cards â€” Net Balance (with savings-rate subtitle), Income, Expenses, Budget Score (0â€“100, clamped; shows top spending category).
+- Spending by Category donut chart (current month expenses, category colors).
+- Income vs Expenses 6-month bar chart (month labels).
+- Budget vs Actual progress list (per-category: planned vs actual, color-coded, over-budget warning).
+- Recent transactions list (latest 5) with empty state.
+- Grid: 2 columns on mobile for stats, collapses charts/panels to single column on mobile, 2 columns on desktop.
+
+### Transactions ("/transactions")
+- Summary cards: total income, total expense, net balance for the filtered set.
+- Search box + filters: type (income/expense), category, month.
+- Transactions grouped by date; each row shows type icon (color-coded: green income, red expense), description, category chip, recurring badge, date, signed amount, hover edit/delete actions.
+- Add/Edit dialog form: date, amount, type, category (filtered by type), description, recurring checkbox, notes.
+- Delete confirmation.
+- Optimistic cache invalidation after every mutation, scoped to the user's cache key.
+
+### Accounts ("/accounts")
+- Net worth summary header with per-type sub-totals (cash, bank, mobile wallet).
+- Tab filter by account type + "All".
+- Account cards: type icon, name, institution, masked account number, color-themed card with decorative background, current balance, active status; hover edit/delete.
+- Add/Edit dialog: name, type (with icon + suggested institution presets like FNB, Standard Bank, MTN, Airtel), institution, account number (masked), balance, color picker, notes, active toggle.
+- Delete confirmation.
+
+### Budgets ("/budgets")
+- Month selector (prev/next navigation, shows "Budgets for <Month Year>").
+- Summary cards: total planned, total actual, variance.
+- Per-category budget cards with progress bars, percentage used, over/under indicators.
+- Add/Edit dialog: month, expense category, planned amount, notes; prevent duplicate category+month budgets.
+- Delete confirmation.
+
+### Analytics ("/analytics")
+- Stat cards: total income, total expenses, net balance, savings rate.
+- Line/bar chart: monthly income vs expenses trend.
+- Pie chart: spending by category (top categories, "Other" bucket for the rest).
+- Budget vs Actual comparison chart/table.
+- Top spending categories list with amounts and percentages.
+- Uses all-time data (not just current month).
+
+### Settings ("/settings")
+- **Category management**: list of income and expense categories with color dots; add/edit dialog (name, type, color from preset palette); delete with confirmation; deleting a category warns if transactions use it.
+- **Excel import**: upload an Excel file; AI extracts transactions and budgets from the sheets (handles expense/income/budget sheet layouts, various date formats, category-name normalization with automatic category creation); progress dialog with per-section status; batch-inserts all records tagged to the importing user only.
+- **CSV templates**: downloadable CSV template for transactions/budget data entry.
+- **Reports**: filter by month and type; preview summary (total income, expenses, count); export the filtered report as CSV or JSON download.
+
+## 5. Design System
+
+- Font: Inter (300â€“700), Google Fonts import.
+- Light theme tokens: soft blue-grey background, white cards, indigo/violet primary (243 75% 59%), green success, amber warning, red destructive; dark mode equivalents defined too.
+- Rounded corners: 0.75rem base radius; cards rounded-2xl.
+- Use semantic Tailwind tokens (bg-card, text-foreground, text-muted-foreground, border-border, bg-primary, text-primary-foreground, bg-destructive...) mapped through the Tailwind config â€” no hardcoded hex values in components.
+- shadcn/ui components (Button, Dialog, Input, Select, Label, Tabs, Progress, Toast...) for consistent, accessible controls.
+- Loading spinners/skeletons while queries run; empty-state messages for every list; toast feedback on successful create/update/delete/import.
+- Icons: lucide-react only.
+- Fully responsive: stats grid-cols-2 â†’ md:grid-cols-4; charts and panels stack on mobile, 2-up on md+; dialogs usable on small screens.
+
+## 6. Data & Query Architecture
+
+- Data fetching via React Query (useQuery) with user-scoped cache keys; mutations via useMutation with cache invalidation.
+- All list queries filtered by the current user's identity and sorted sensibly (transactions by date desc, accounts by created date desc).
+- Never seed or display another user's data; a new user starts with an empty but welcoming dashboard (empty states everywhere).
+- Currency formatting via a single shared helper with sensible defaults (e.g. Zambian Kwacha or user-locale), reused by every page.
+
+## 7. Acceptance Criteria
+
+- A logged-in user sees ONLY their own transactions, budgets, categories, and accounts on every page, enforced both in queries and at the database (RLS).
+- Two different users on the same app see completely different data.
+- Every create, edit, and delete works from the UI and persists after reload.
+- Excel import creates only transactions/budgets belonging to the importing user.
+- On a phone browser, the bottom nav is always visible and tappable; content never hides behind it.
+- On desktop, the hamburger menu opens the sidebar; navigation works with one tap at every breakpoint.
