@@ -31,9 +31,11 @@ WalletWise/
 ├── drizzle.config.ts              # Drizzle ORM configuration for D1
 ├── docs/                          # All secondary documentation
 │   ├── adr/                       # Architectural Decision Records (ADR-001, ADR-002...)
-│   │   └── 001-cloudflare-fullstack-architecture.md
+│   │   ├── 001-cloudflare-fullstack-architecture.md
+│   │   └── 002-better-auth-cloudflare-adapter-and-catch-all-routing.md
 │   ├── bugsnfix/                  # Bug reports, incident logs, root causes, and fixes
-│   │   └── README.md
+│   │   ├── README.md              # Bug index (authoritative list)
+│   │   └── BUG-0XX-*.md           # One file per bug, indexed in README.md
 │   └── api/                       # API contracts and endpoint documentation
 ├── src/
 │   ├── assets/                    # Static assets, logos, icons
@@ -219,8 +221,8 @@ All records automatically include `id`, `created_date`, `updated_date`, and `cre
 - [x] Wire Workers AI (`@cf/meta/llama-3.3-70b-instruct-fp8-fast`) to normalize uploaded spreadsheets into transactions/budgets. **Previously overclaimed** for the same reason as Phase 5 — the parse call was proven at the endpoint level only. Corrected status: the parser is proven live, and the UI now reaches it behind a real session, but AI output reaching the import review modal has been exercised via the deterministic/API path rather than a browser upload of a messy sheet.
 
 #### Phase 7: Migrations, Testing, and Deploy
-- [ ] Run `drizzle-kit generate` and apply migrations (`--local` then `--remote`).
-- [ ] Seed default categories server-side on first signup.
-- [ ] Verify locally with `wrangler pages dev dist --compatibility-flag=nodejs_compat`.
-- [ ] Push to GitHub, connect Cloudflare Pages, set production bindings, and apply `wrangler secret put` for required secrets.
+- [ ] Run `drizzle-kit generate` and apply migrations (`--local` then `--remote`). **Partially done:** migrations are generated and `--local` is applied (`No migrations to apply!`). `--remote` requires a real D1 database ID.
+- [x] Seed default categories server-side on first signup. Idempotent `databaseHooks.user.create.after` in `src/lib/auth.ts`; a new user is verified to receive exactly 9 categories.
+- [x] Verify locally with `wrangler pages dev dist --compatibility-flag=nodejs_compat`. Verified end to end in a browser: signup → session cookie → reload → authenticated; sign out → gated view; two users see zero cross-user data; create transaction → Dashboard/Analytics update without reload; import duplicate → preview → Replace keeps row id / Skip omits.
+- [ ] Push to GitHub, connect Cloudflare Pages, set production bindings, and apply `wrangler secret put` for required secrets. **Blocked on Cloudflare access** — `wrangler.jsonc` still carries the placeholder `database_id: "local-walletwise-db"`.
 
