@@ -185,38 +185,38 @@ All records automatically include `id`, `created_date`, `updated_date`, and `cre
 
 #### Phase 0: Frontend Quick Fixes
 - [x] Fix `ToastContainer` prop mismatch: rename `message` → `description` in `Toast.tsx` and remove conflicting 5s `useEffect` timer from component. Context's 4s `setTimeout` is now the single dismissal authority.
-- [x] Gate demo seed data (`transactions`, `budgets`, `accounts`) behind `import.meta.env.DEV` in `FinanceContext.tsx` so production starts empty while preserving `localStorage` reads when present.
+- [x] ~~Gate demo seed data (`transactions`, `budgets`, `accounts`) behind `import.meta.env.DEV` in `FinanceContext.tsx` so production starts empty while preserving `localStorage` reads when present.~~ **Superseded:** `FinanceContext.tsx` no longer contains demo seed data or any `localStorage` access — it is now toasts + session-derived `currentUser` only. All views read from D1 via React Query. See `BUG-005`.
 - [x] Verify feature-view styling (`TransactionsView`, `BudgetsView`, `AnalyticsView`, `SettingsView`, `AccountsView`) already uses CSS tokens (`bg-surface`, `text-platinum`, `border-hairline`); no mechanical refactor required.
 
 #### Phase 1: Currency Preference (Data Model)
 - [x] Update `formatCurrency` default from `'ZMW'` to `'MWK'` in `src/lib/utils.ts`.
 - [x] Extend `User` type with `currency?: string` in `src/types/index.ts`.
 - [x] Add `currency: text('currency').notNull().default('MWK')` to Better Auth `user` table in `src/db/schema.ts`.
-- [ ] Add Preferences sub-tab and currency dropdown in `SettingsView.tsx`; persist via `PATCH /api/user/me` (requires API layer).
+- [ ] Add Preferences sub-tab and currency dropdown in `SettingsView.tsx`; persist via `PATCH /api/user/me`. **Still outstanding — now unblocked:** the API layer exists (`/api/user/me` GET/PATCH) and `useUser.ts` exports `useUpdateUser()`, but the dropdown UI is not built and `useUpdateUser` has no consumer. Currency is currently read-only in the UI via `useCurrency()` and threaded through every `formatCurrency` call.
 
 #### Phase 2: Better Auth on Cloudflare D1
-- [ ] Install `better-auth` and `@better-auth/d1-adapter`.
-- [ ] Create `src/lib/auth.ts` with D1 adapter, email/password provider, and `user.currency` inclusion.
-- [x] Create `functions/api/auth/[[all]].ts` mount point.
-- [ ] Create `functions/_middleware.ts` to verify session cookies and inject `userId`; reject unauthenticated requests with `401`.
+- [x] Install `better-auth` and `better-auth-cloudflare`. **Corrected:** the planned `@better-auth/d1-adapter` was **not** used — the existing Drizzle instance is passed through `better-auth-cloudflare`'s `withCloudflare` so the auth and application tables share one schema. Rationale in `ADR-002`.
+- [x] Create `src/lib/auth.ts` with the D1/Drizzle adapter, email/password provider, and `user.currency` inclusion. (`geolocationTracking: false` — the `session` table has no geolocation columns; IP detection via `cf-connecting-ip` / `x-real-ip`.)
+- [x] Create `functions/api/auth/[[all]].ts` mount point. Catch-all is `[[all]].ts`, **not** `[[...all]].ts` — wrangler rejects bracket-dots in parameter names.
+- [x] Create `functions/_middleware.ts` to verify session cookies and inject `userId`; reject unauthenticated requests with `401`. Verified: signed-out `GET /api/transactions` returns `401`.
 
 #### Phase 3: Workers CRUD API Layer
-- [ ] Implement transactions, accounts, budgets, categories, and user endpoints under `functions/api/`.
-- [ ] Enforce strict `created_by_id` scoping, input validation, and sanitized error responses.
+- [x] Implement transactions, accounts, budgets, categories, and user endpoints under `functions/api/`.
+- [x] Enforce strict `created_by_id` scoping, input validation, and sanitized error responses. Shared validators and the duplicate-identity keys live in `functions/lib/validation.ts`; the budget unique-index violation is mapped to `409`.
 
 #### Phase 4: React Query Migration
-- [ ] Create `src/lib/api.ts` fetch client with `credentials: 'include'`.
-- [ ] Create React Query hooks (`useTransactions`, `useAccounts`, `useBudgets`, `useCategories`, `useUser`).
-- [ ] Refactor `FinanceContext` to delegate data operations to React Query; call `queryClient.clear()` on logout.
-- [ ] Update all views to use new hooks and invalidate relevant query keys on mutations.
+- [x] Create `src/lib/api.ts` fetch client with `credentials: 'include'`. Dispatches `walletwise:unauthorized` on `401`.
+- [x] Create React Query hooks (`useTransactions`, `useAccounts`, `useBudgets`, `useCategories`, `useUser`), plus `useAnalytics`, `useSession`, and `useBulkImport`.
+- [x] Refactor `FinanceContext` to delegate data operations to React Query; call `queryClient.clear()` on logout. Context is now toasts + session-derived `currentUser`; no data methods, no `localStorage`.
+- [x] Update all views to use new hooks and invalidate relevant query keys on mutations. Transaction and budget mutations also invalidate the analytics keys, so a new record updates Dashboard and Analytics without a reload. **This phase was the gap that made the whole backend unreachable — see `BUG-005`.**
 
 #### Phase 5: R2 Storage Endpoints
 - [x] Implement presigned URL generators for upload (`POST`) and download (`GET`).
-- [x] Integrate with `SettingsView` Excel upload and transaction receipt attachments.
+- [x] Integrate with `SettingsView` Excel upload and transaction receipt attachments. **Previously overclaimed** — this was `[x]` while the UI had no way to authenticate, so the integration had never executed behind a real session (`BUG-005`). Corrected status: the Excel path is now proven end to end against a live session (upload → `mode=preview` → duplicate review → `mode=commit`). The receipt attachment control is present but its upload round-trip has **not** been browser-verified.
 
 #### Phase 6: Workers AI Spreadsheet Parser
-- [x] Create `POST /api/ai/parse-spreadsheet` endpoint.
-- [x] Wire Workers AI (`@cf/meta/llama-3.3-70b-instruct-fp8-fast`) to normalize uploaded spreadsheets into transactions/budgets.
+- [x] Create `POST /api/ai/parse-spreadsheet` endpoint. Live `source: "ai"` results recorded in `BUG-004-deprecated-workers-ai-model.md`.
+- [x] Wire Workers AI (`@cf/meta/llama-3.3-70b-instruct-fp8-fast`) to normalize uploaded spreadsheets into transactions/budgets. **Previously overclaimed** for the same reason as Phase 5 — the parse call was proven at the endpoint level only. Corrected status: the parser is proven live, and the UI now reaches it behind a real session, but AI output reaching the import review modal has been exercised via the deterministic/API path rather than a browser upload of a messy sheet.
 
 #### Phase 7: Migrations, Testing, and Deploy
 - [ ] Run `drizzle-kit generate` and apply migrations (`--local` then `--remote`).
