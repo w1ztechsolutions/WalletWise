@@ -18,6 +18,14 @@ import { useFinance } from '@/context/FinanceContext'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { apiFetch } from '@/lib/api'
 import { validateFileForKind } from '@/lib/storagePolicy'
+import {
+  useTransactions,
+  useAddTransaction,
+  useUpdateTransaction,
+  useDeleteTransaction,
+} from '@/hooks/useTransactions'
+import { useCategories } from '@/hooks/useCategories'
+import { useCurrency } from '@/hooks/useUser'
 import type { Transaction, TransactionType } from '@/types'
 
 interface TransactionsViewProps {
@@ -26,7 +34,13 @@ interface TransactionsViewProps {
 }
 
 export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOpen, setIsAddModalOpen }) => {
-  const { transactions, categories, addTransaction, updateTransaction, deleteTransaction, addToast } = useFinance()
+  const { addToast } = useFinance()
+  const currency = useCurrency()
+  const { data: transactions = [], isPending: isLoading } = useTransactions()
+  const { data: categories = [] } = useCategories()
+  const { mutate: createTransaction, isPending: isCreating } = useAddTransaction()
+  const { mutate: saveTransaction, isPending: isUpdating } = useUpdateTransaction()
+  const { mutate: removeTransaction } = useDeleteTransaction()
 
   // Filter States
   const [search, setSearch] = useState('')
@@ -53,7 +67,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
     date: new Date().toISOString().split('T')[0],
     amount: '',
     description: '',
-    category_id: categories[0]?.id || '',
+    category_id: '',
     type: 'expense',
     is_recurring: false,
     notes: '',
@@ -65,12 +79,24 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
   const [receiptFile, setReceiptFile] = useState<File | null>(null)
   const [isUploadingReceipt, setIsUploadingReceipt] = useState(false)
 
+  const expenseCategoryId = categories.find((c) => c.type === 'expense')?.id || categories[0]?.id || ''
+
+  /**
+   * Categories arrive after first paint, so the form's stored id may not exist
+   * yet. Derive the id actually used — both by the `<select>` and on save —
+   * instead of syncing it through an effect.
+   */
+  const activeCategoryId =
+    formData.category_id && categories.some((c) => c.id === formData.category_id)
+      ? formData.category_id
+      : categories.find((c) => c.type === formData.type)?.id ?? expenseCategoryId
+
   const resetForm = () => {
     setFormData({
       date: new Date().toISOString().split('T')[0],
       amount: '',
       description: '',
-      category_id: categories.find((c) => c.type === 'expense')?.id || categories[0]?.id || '',
+      category_id: expenseCategoryId,
       type: 'expense',
       is_recurring: false,
       notes: '',
@@ -169,7 +195,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
     const amt = parseFloat(formData.amount)
     if (isNaN(amt) || amt <= 0) return
 
-    const selectedCat = categories.find((c) => c.id === formData.category_id)
+    const selectedCat = categories.find((c) => c.id === activeCategoryId)
     const category_name = selectedCat?.name || 'General'
 
     // Phase 6.5 — upload the receipt first so the record never references
@@ -204,7 +230,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
       date: formData.date,
       amount: amt,
       description: formData.description.trim(),
-      category_id: formData.category_id,
+      category_id: activeCategoryId,
       category_name,
       type: formData.type,
       is_recurring: formData.is_recurring,
@@ -213,10 +239,34 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
       attachment_name: attachmentName,
     }
 
+    const onError = (err: unknown) => {
+      addToast(
+        'Unable to save transaction',
+        err instanceof Error ? err.message : 'Please try again.',
+        'error'
+      )
+    }
+
     if (editingTransaction) {
-      updateTransaction(editingTransaction.id, payload)
+      saveTransaction(
+        { id: editingTransaction.id, ...payload },
+        {
+          onSuccess: () => addToast('Transaction updated', 'Changes have been saved.', 'success'),
+          onError,
+        }
+      )
     } else {
-      addTransaction(payload)
+      createTransaction(payload, {
+        onSuccess: () =>
+          addToast(
+            'Transaction recorded',
+            `${payload.type === 'income' ? '+' : '-'}${payload.amount} for ${
+              payload.description || payload.category_name
+            }`,
+            'success'
+          ),
+        onError,
+      })
     }
 
     setIsAddModalOpen(false)
@@ -261,18 +311,26 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
 
   return (
     <div className="space-y-6 pb-20 md:pb-6">
+      {/* D1 has not answered yet — don't claim "no transactions found" prematurely. */}
+      {isLoading && (
+        <div className="flex items-center justify-center gap-3 py-12 rounded-2xl bg-surface border border-hairline">
+          <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin border-indigo" />
+          <span className="text-xs text-muted">Loading transactions…</span>
+        </div>
+      )}
+
       {/* Top Action & Summary Bar */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
         <div className="bg-surface rounded-2xl p-4 border border-hairline shadow-card">
           <span className="text-xs text-muted font-medium">Filtered Income</span>
           <p className="text-lg sm:text-xl font-bold text-success mt-1">
-            +{formatCurrency(summary.income)}
+            +{formatCurrency(summary.income, currency)}
           </p>
         </div>
         <div className="bg-surface rounded-2xl p-4 border border-hairline shadow-card">
           <span className="text-xs text-muted font-medium">Filtered Expense</span>
           <p className="text-lg sm:text-xl font-bold text-danger mt-1">
-            -{formatCurrency(summary.expense)}
+            -{formatCurrency(summary.expense, currency)}
           </p>
         </div>
         <div className="bg-surface rounded-2xl p-4 border border-hairline shadow-card">
@@ -282,7 +340,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
               summary.net >= 0 ? 'text-success' : 'text-danger'
             }`}
           >
-            {formatCurrency(summary.net)}
+            {formatCurrency(summary.net, currency)}
           </p>
         </div>
       </div>
@@ -451,7 +509,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
                         }`}
                       >
                         {tx.type === 'income' ? '+' : '-'}
-                        {formatCurrency(tx.amount)}
+                        {formatCurrency(tx.amount, currency)}
                       </span>
 
                       {/* Actions: Edit & Delete (visible on hover / focus) */}
@@ -585,7 +643,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
                 </label>
                 <select
                   required
-                  value={formData.category_id}
+                  value={activeCategoryId}
                   onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
                   className="w-full px-3 py-2 text-sm rounded-xl bg-surface-3 border border-hairline text-platinum focus:outline-none focus:ring-2 focus:ring-indigo"
                 >
@@ -728,10 +786,14 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
                 </button>
                 <button
                   type="submit"
-                  disabled={isUploadingReceipt}
+                  disabled={isUploadingReceipt || isCreating || isUpdating}
                   className="px-5 py-2 text-xs font-semibold bg-gold hover:bg-gold-hover text-ink shadow-gold rounded-xl transition-all disabled:opacity-60 disabled:cursor-wait"
                 >
-                  {editingTransaction ? 'Save Changes' : 'Record Transaction'}
+                  {isCreating || isUpdating
+                    ? 'Saving…'
+                    : editingTransaction
+                      ? 'Save Changes'
+                      : 'Record Transaction'}
                 </button>
               </div>
             </form>
@@ -759,7 +821,15 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
               <button
                 onClick={() => {
                   const tx = transactions.find((t) => t.id === deletingId)
-                  deleteTransaction(deletingId)
+                  removeTransaction(deletingId, {
+                    onSuccess: () => addToast('Transaction deleted', 'Record was removed.', 'info'),
+                    onError: (err: unknown) =>
+                      addToast(
+                        'Unable to delete transaction',
+                        err instanceof Error ? err.message : 'Please try again.',
+                        'error'
+                      ),
+                  })
                   // Phase 6.5 — remove the private receipt object as well
                   if (tx?.attachment_key) deleteObjectQuiet(tx.attachment_key)
                   setDeletingId(null)

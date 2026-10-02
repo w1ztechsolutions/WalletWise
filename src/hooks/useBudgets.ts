@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
+import { analyticsKeys } from "@/hooks/useAnalytics";
 import type { Budget } from "@/types";
 
 export const budgetKeys = {
@@ -19,6 +20,15 @@ export function useBudgets(month?: string) {
   });
 }
 
+/**
+ * The dashboard's `overview` payload embeds the current month's budgets, so a
+ * budget write has to invalidate analytics as well as the budget list.
+ */
+function invalidateAfterBudgetWrite(queryClient: ReturnType<typeof useQueryClient>) {
+  queryClient.invalidateQueries({ queryKey: budgetKeys.all });
+  queryClient.invalidateQueries({ queryKey: analyticsKeys.all });
+}
+
 export function useAddBudget() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -27,9 +37,7 @@ export function useAddBudget() {
         method: "POST",
         body: JSON.stringify(data),
       }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: budgetKeys.all });
-    },
+    onSuccess: () => invalidateAfterBudgetWrite(queryClient),
   });
 }
 
@@ -41,9 +49,7 @@ export function useUpdateBudget() {
         method: "PUT",
         body: JSON.stringify(data),
       }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: budgetKeys.all });
-    },
+    onSuccess: () => invalidateAfterBudgetWrite(queryClient),
   });
 }
 
@@ -54,8 +60,6 @@ export function useDeleteBudget() {
       apiFetch<{ success: boolean }>(`/budgets/${id}`, {
         method: "DELETE",
       }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: budgetKeys.all });
-    },
+    onSuccess: () => invalidateAfterBudgetWrite(queryClient),
   });
 }

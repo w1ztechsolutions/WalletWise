@@ -10,14 +10,31 @@ import {
   X,
   PiggyBank,
 } from 'lucide-react'
-import { useFinance } from '@/context/FinanceContext'
 import { formatCurrency, getCurrentMonth } from '@/lib/utils'
+import { useBudgets, useAddBudget, useUpdateBudget, useDeleteBudget } from '@/hooks/useBudgets'
+import { useCategories } from '@/hooks/useCategories'
+import { useTransactions } from '@/hooks/useTransactions'
+import { useCurrency } from '@/hooks/useUser'
+import { useFinance } from '@/context/FinanceContext'
 import type { Budget } from '@/types'
 
 export const BudgetsView: React.FC = () => {
-  const { budgets, transactions, categories, addBudget, updateBudget, deleteBudget } = useFinance()
-
+  const { addToast } = useFinance()
+  const currency = useCurrency()
   const [selectedMonth, setSelectedMonth] = useState<string>(getCurrentMonth())
+
+  const { data: budgets = [] } = useBudgets(selectedMonth)
+  const { data: categories = [], isPending: isLoadingCategories } = useCategories()
+  const { data: transactions = [] } = useTransactions({ month: selectedMonth, type: 'expense' })
+  const { mutate: createBudget } = useAddBudget()
+  const { mutate: saveBudget, isPending: isSaving } = useUpdateBudget()
+  const { mutate: removeBudget } = useDeleteBudget()
+
+  const expenseCategoryId = useMemo(
+    () => categories.find((c) => c.type === 'expense')?.id || categories[0]?.id || '',
+    [categories]
+  )
+
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -27,10 +44,17 @@ export const BudgetsView: React.FC = () => {
     planned_amount: string
     notes: string
   }>({
-    category_id: categories.find((c) => c.type === 'expense')?.id || categories[0]?.id || '',
+    category_id: expenseCategoryId,
     planned_amount: '',
     notes: '',
   })
+
+  // Categories arrive after first paint; derive the id the form actually submits
+  // rather than syncing state through an effect.
+  const activeCategoryId =
+    formData.category_id && categories.some((c) => c.id === formData.category_id)
+      ? formData.category_id
+      : expenseCategoryId
 
   // Navigate month
   const changeMonth = (offset: number) => {
@@ -46,39 +70,32 @@ export const BudgetsView: React.FC = () => {
     return date.toLocaleString('en-US', { month: 'long', year: 'numeric' })
   }, [selectedMonth])
 
-  // Current month budget items
-  const monthBudgets = useMemo(() => {
-    return budgets.filter((b) => b.month === selectedMonth)
-  }, [budgets, selectedMonth])
-
   // Category spending for selected month
   const categoryActuals = useMemo(() => {
     const map: Record<string, number> = {}
-    transactions
-      .filter((t) => t.date.startsWith(selectedMonth) && t.type === 'expense')
-      .forEach((t) => {
-        map[t.category_id] = (map[t.category_id] || 0) + t.amount
-      })
+    transactions.forEach((t) => {
+      map[t.category_id] = (map[t.category_id] || 0) + t.amount
+    })
     return map
-  }, [transactions, selectedMonth])
+  }, [transactions])
 
   // Summary
   const summary = useMemo(() => {
     let totalPlanned = 0
     let totalActual = 0
 
-    monthBudgets.forEach((b) => {
+    budgets.forEach((b) => {
       totalPlanned += b.planned_amount
       totalActual += categoryActuals[b.category_id] || 0
     })
 
     const variance = totalPlanned - totalActual
     return { totalPlanned, totalActual, variance }
-  }, [monthBudgets, categoryActuals])
+  }, [budgets, categoryActuals])
 
   const resetForm = () => {
     setFormData({
-      category_id: categories.find((c) => c.type === 'expense')?.id || categories[0]?.id || '',
+      category_id: expenseCategoryId,
       planned_amount: '',
       notes: '',
     })
@@ -100,25 +117,70 @@ export const BudgetsView: React.FC = () => {
     const amt = parseFloat(formData.planned_amount)
     if (isNaN(amt) || amt <= 0) return
 
-    const cat = categories.find((c) => c.id === formData.category_id)
+    const cat = categories.find((c) => c.id === activeCategoryId)
     const category_name = cat?.name || 'Category'
 
     if (editingBudget) {
-      updateBudget(editingBudget.id, {
-        category_id: formData.category_id,
-        category_name,
-        planned_amount: amt,
-        notes: formData.notes.trim(),
-      })
+      saveBudget(
+        {
+          id: editingBudget.id,
+          category_id: activeCategoryId,
+          category_name,
+          planned_amount: amt,
+          notes: formData.notes.trim(),
+        },
+        {
+          onSuccess: () =>
+            addToast('Budget updated', 'Planned amount updated successfully.', 'success'),
+          onError: (err: unknown) =>
+            addToast(
+              'Unable to update budget',
+              err instanceof Error ? err.message : 'Please try again.',
+              'error'
+            ),
+        }
+      )
     } else {
-      const res = addBudget({
-        month: selectedMonth,
-        category_id: formData.category_id,
-        category_name,
-        planned_amount: amt,
-        notes: formData.notes.trim(),
-      })
-      if (!res.success) return
+      // Client-side duplicate check. `functions/api/budgets/index.ts` also
+      // returns 409 for the same case via its unique index; both paths surface
+      // the same toast so the user sees one consistent message.
+      const alreadyBudgeted = budgets.some(
+        (b) => b.month === selectedMonth && b.category_id === activeCategoryId
+      )
+      if (alreadyBudgeted) {
+        addToast(
+          'Duplicate budget',
+          'A budget already exists for this category in this month.',
+          'error'
+        )
+        return
+      }
+
+      createBudget(
+        {
+          month: selectedMonth,
+          category_id: activeCategoryId,
+          category_name,
+          planned_amount: amt,
+          notes: formData.notes.trim(),
+        },
+        {
+          onSuccess: () =>
+            addToast(
+              'Budget created',
+              `Planned budget of ${amt} for ${category_name}`,
+              'success'
+            ),
+          onError: (err: unknown) =>
+            addToast(
+              'Duplicate budget',
+              err instanceof Error && err.message
+                ? err.message
+                : 'A budget already exists for this category in this month.',
+              'error'
+            ),
+        }
+      )
     }
 
     setIsModalOpen(false)
@@ -127,6 +189,13 @@ export const BudgetsView: React.FC = () => {
 
   return (
     <div className="space-y-6 pb-20 md:pb-6">
+      {isLoadingCategories && (
+        <div className="flex items-center justify-center gap-3 py-10 rounded-2xl bg-surface border border-hairline">
+          <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin border-gold" />
+          <span className="text-xs text-muted">Loading budgets…</span>
+        </div>
+      )}
+
       {/* Month Navigator Header */}
       <div className="bg-surface rounded-2xl p-4 sm:p-5 border border-hairline shadow-card flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-2">
@@ -171,14 +240,14 @@ export const BudgetsView: React.FC = () => {
         <div className="bg-surface rounded-2xl p-4 border border-hairline shadow-card">
           <span className="text-xs text-muted font-medium">Total Planned</span>
           <p className="text-xl font-bold text-platinum mt-1">
-            {formatCurrency(summary.totalPlanned)}
+            {formatCurrency(summary.totalPlanned, currency)}
           </p>
         </div>
 
         <div className="bg-surface rounded-2xl p-4 border border-hairline shadow-card">
           <span className="text-xs text-muted font-medium">Total Spent (Actual)</span>
           <p className="text-xl font-bold text-danger mt-1">
-            {formatCurrency(summary.totalActual)}
+            {formatCurrency(summary.totalActual, currency)}
           </p>
         </div>
 
@@ -190,13 +259,13 @@ export const BudgetsView: React.FC = () => {
             }`}
           >
             {summary.variance >= 0 ? '+' : ''}
-            {formatCurrency(summary.variance)}
+            {formatCurrency(summary.variance, currency)}
           </p>
         </div>
       </div>
 
       {/* Budget Cards with Progress Bars */}
-      {monthBudgets.length === 0 ? (
+      {budgets.length === 0 ? (
         <div className="bg-surface rounded-2xl p-12 border border-hairline text-center">
           <PiggyBank className="w-10 h-10 text-muted mx-auto mb-3" />
           <h3 className="text-base font-semibold text-platinum">
@@ -217,7 +286,7 @@ export const BudgetsView: React.FC = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {monthBudgets.map((b) => {
+          {budgets.map((b) => {
             const actual = categoryActuals[b.category_id] || 0
             const percentage = b.planned_amount > 0 ? Math.round((actual / b.planned_amount) * 100) : 0
             const isOver = actual > b.planned_amount
@@ -264,10 +333,10 @@ export const BudgetsView: React.FC = () => {
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-muted">
-                      Spent: <strong className="text-platinum">{formatCurrency(actual)}</strong>
+                      Spent: <strong className="text-platinum">{formatCurrency(actual, currency)}</strong>
                     </span>
                     <span className="text-muted">
-                      Target: <strong className="text-platinum">{formatCurrency(b.planned_amount)}</strong>
+                      Target: <strong className="text-platinum">{formatCurrency(b.planned_amount, currency)}</strong>
                     </span>
                   </div>
 
@@ -294,12 +363,12 @@ export const BudgetsView: React.FC = () => {
                     {isOver ? (
                       <span className="inline-flex items-center gap-1 font-bold text-danger">
                         <AlertTriangle className="w-3.5 h-3.5" />
-                        <span>Over by {formatCurrency(Math.abs(remaining))}</span>
+                        <span>Over by {formatCurrency(Math.abs(remaining), currency)}</span>
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 font-medium text-success">
                         <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>{formatCurrency(remaining)} remaining</span>
+                        <span>{formatCurrency(remaining, currency)} remaining</span>
                       </span>
                     )}
                   </div>
@@ -337,7 +406,7 @@ export const BudgetsView: React.FC = () => {
                 <select
                   required
                   disabled={!!editingBudget}
-                  value={formData.category_id}
+                  value={activeCategoryId}
                   onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
                   className="w-full px-3 py-2 text-sm rounded-xl bg-surface-3 border border-hairline text-platinum focus:outline-none focus:ring-2 focus:ring-indigo disabled:opacity-60"
                 >
@@ -398,9 +467,10 @@ export const BudgetsView: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 text-xs font-semibold bg-gold hover:bg-gold-hover text-ink shadow-gold rounded-xl"
+                  disabled={isSaving}
+                  className="px-5 py-2 text-xs font-semibold bg-gold hover:bg-gold-hover text-ink shadow-gold rounded-xl disabled:opacity-60 disabled:cursor-wait"
                 >
-                  {editingBudget ? 'Update Budget' : 'Save Budget'}
+                  {isSaving ? 'Saving…' : editingBudget ? 'Update Budget' : 'Save Budget'}
                 </button>
               </div>
             </form>
@@ -427,7 +497,7 @@ export const BudgetsView: React.FC = () => {
               </button>
               <button
                 onClick={() => {
-                  deleteBudget(deletingId)
+                  removeBudget(deletingId, { onSuccess: () => addToast('Budget deleted', 'Budget allocation removed.', 'info'), onError: (err: unknown) => addToast('Unable to delete budget', err instanceof Error ? err.message : 'Please try again.', 'error') })
                   setDeletingId(null)
                 }}
                 className="px-4 py-2 text-xs font-semibold bg-danger hover:bg-danger/90 text-ink rounded-xl"

@@ -23,116 +23,78 @@ import {
   LineChart,
   Line,
 } from 'recharts'
-import { useFinance } from '@/context/FinanceContext'
 import { formatCurrency } from '@/lib/utils'
+import {
+  useAnalytics,
+  type AnalyticsAllTime,
+  type AnalyticsMonthly,
+} from '@/hooks/useAnalytics'
+import { useCategories } from '@/hooks/useCategories'
+import { useCurrency } from '@/hooks/useUser'
 
 export const AnalyticsView: React.FC = () => {
-  const { transactions, categories, budgets } = useFinance()
+  const currency = useCurrency()
+  const { data: allTime, isPending: isLoadingAllTime } = useAnalytics('all-time')
+  const { data: monthly, isPending: isLoadingMonthly } = useAnalytics('monthly')
+  const { data: categories } = useCategories()
 
   // 1. All-time summary
   const summary = useMemo(() => {
-    let income = 0
-    let expenses = 0
-
-    transactions.forEach((t) => {
-      if (t.type === 'income') income += t.amount
-      else expenses += t.amount
-    })
-
-    const net = income - expenses
-    const savingsRate = income > 0 ? Math.max(0, Math.round(((income - expenses) / income) * 100)) : 0
-
+    const data = allTime as AnalyticsAllTime | undefined
+    const income = data?.totalIncome ?? 0
+    const expenses = data?.totalExpenses ?? 0
+    const net = data?.netBalance ?? 0
+    const savingsRate = data?.savingsRate ?? 0
     return { income, expenses, net, savingsRate }
-  }, [transactions])
+  }, [allTime])
 
-  // 2. Monthly Income vs Expenses Trend (All available months)
+  // 2. Monthly Income vs Expenses Trend (6-month window served by the API)
   const monthlyTrend = useMemo(() => {
-    const monthMap: Record<string, { month: string; Income: number; Expenses: number; Net: number }> = {}
-
-    transactions.forEach((t) => {
-      const ym = t.date.substring(0, 7) // YYYY-MM
-      if (!monthMap[ym]) {
-        monthMap[ym] = { month: ym, Income: 0, Expenses: 0, Net: 0 }
-      }
-      if (t.type === 'income') monthMap[ym].Income += t.amount
-      else monthMap[ym].Expenses += t.amount
-    })
-
-    const sortedMonths = Object.keys(monthMap).sort()
-    return sortedMonths.map((ym) => {
-      const [y, m] = ym.split('-').map(Number)
+    const months = (monthly as AnalyticsMonthly | undefined)?.months ?? []
+    return months.map((row) => {
+      const [y, m] = row.month.split('-').map(Number)
       const d = new Date(y, m - 1, 1)
-      const label = d.toLocaleString('en-US', { month: 'short', year: '2-digit' })
-      const data = monthMap[ym]
       return {
-        month: label,
-        Income: data.Income,
-        Expenses: data.Expenses,
-        Net: data.Income - data.Expenses,
+        month: d.toLocaleString('en-US', { month: 'short', year: '2-digit' }),
+        Income: row.income,
+        Expenses: row.expenses,
+        Net: row.net,
       }
     })
-  }, [transactions])
+  }, [monthly])
 
   // 3. Spending by Category (Top categories + "Other" bucket)
   const categoryPieData = useMemo(() => {
-    const map: Record<string, { name: string; amount: number; color: string }> = {}
-    let totalExpense = 0
+    const colorFor = (name: string) =>
+      categories?.find((c) => c.name.toLowerCase() === name.toLowerCase())?.color ?? '#6366f1'
 
-    transactions
-      .filter((t) => t.type === 'expense')
-      .forEach((t) => {
-        totalExpense += t.amount
-        if (!map[t.category_name]) {
-          const cat = categories.find((c) => c.id === t.category_id)
-          map[t.category_name] = {
-            name: t.category_name,
-            amount: 0,
-            color: cat?.color || '#6366f1',
-          }
-        }
-        map[t.category_name].amount += t.amount
-      })
+    const items = ((allTime as AnalyticsAllTime | undefined)?.topCategories ?? []).map((row) => ({
+      name: row.category_name,
+      amount: row.total,
+      color: colorFor(row.category_name),
+    }))
 
-    const sorted = Object.values(map).sort((a, b) => b.amount - a.amount)
-
-    if (sorted.length <= 5) {
-      return { items: sorted, totalExpense }
-    }
-
-    const top5 = sorted.slice(0, 5)
-    const otherAmount = sorted.slice(5).reduce((sum, item) => sum + item.amount, 0)
-    top5.push({ name: 'Other Categories', amount: otherAmount, color: '#94a3b8' })
-
-    return { items: top5, totalExpense }
-  }, [transactions, categories])
+    const totalExpense = items.reduce((sum, item) => sum + item.amount, 0)
+    return { items, totalExpense }
+  }, [allTime, categories])
 
   // 4. Top spending categories ranking with percentages
   const topSpendingRanked = useMemo(() => {
-    const map: Record<string, { name: string; amount: number; color: string }> = {}
-    let totalExpense = 0
+    const totalExpense = categoryPieData.totalExpense
+    return categoryPieData.items.map((item) => ({
+      ...item,
+      percentage: totalExpense > 0 ? Math.round((item.amount / totalExpense) * 100) : 0,
+    }))
+  }, [categoryPieData])
 
-    transactions
-      .filter((t) => t.type === 'expense')
-      .forEach((t) => {
-        totalExpense += t.amount
-        if (!map[t.category_name]) {
-          const cat = categories.find((c) => c.id === t.category_id)
-          map[t.category_name] = {
-            name: t.category_name,
-            amount: 0,
-            color: cat?.color || '#6366f1',
-          }
-        }
-        map[t.category_name].amount += t.amount
-      })
-
-    return Object.values(map)
-      .sort((a, b) => b.amount - a.amount)
-      .map((item) => ({
-        ...item,
-        percentage: totalExpense > 0 ? Math.round((item.amount / totalExpense) * 100) : 0,
-      }))
-  }, [transactions, categories])
+  if (isLoadingAllTime || isLoadingMonthly) {
+    return (
+      <div className="flex items-center justify-center gap-3 py-16 rounded-2xl bg-surface border border-hairline">
+        <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin border-indigo" />
+        <span className="text-xs text-muted">Crunching your analytics…</span>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6 pb-20 md:pb-6">
@@ -141,14 +103,14 @@ export const AnalyticsView: React.FC = () => {
         <div className="bg-surface rounded-2xl p-4 sm:p-5 border border-hairline shadow-card">
           <span className="text-xs text-muted font-medium">All-Time Income</span>
           <p className="text-xl sm:text-2xl font-bold text-success mt-1">
-            +{formatCurrency(summary.income)}
+            +{formatCurrency(summary.income, currency)}
           </p>
         </div>
 
         <div className="bg-surface rounded-2xl p-4 sm:p-5 border border-hairline shadow-card">
           <span className="text-xs text-muted font-medium">All-Time Expenses</span>
           <p className="text-xl sm:text-2xl font-bold text-danger mt-1">
-            -{formatCurrency(summary.expenses)}
+            -{formatCurrency(summary.expenses, currency)}
           </p>
         </div>
 
@@ -159,7 +121,7 @@ export const AnalyticsView: React.FC = () => {
               summary.net >= 0 ? 'text-success' : 'text-danger'
             }`}
           >
-            {formatCurrency(summary.net)}
+            {formatCurrency(summary.net, currency)}
           </p>
         </div>
 
@@ -194,7 +156,7 @@ export const AnalyticsView: React.FC = () => {
                 <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke="#94a3b8" />
                 <YAxis tick={{ fontSize: 11 }} stroke="#94a3b8" />
                 <Tooltip
-                  formatter={(val: any) => [formatCurrency(Number(val)), '']}
+                  formatter={(val: any) => [formatCurrency(Number(val), currency), '']}
                   contentStyle={{
                     backgroundColor: '#1A1A24',
                     borderColor: '#2D2D3A',
@@ -247,7 +209,7 @@ export const AnalyticsView: React.FC = () => {
                     ))}
                   </Pie>
                   <Tooltip
-                    formatter={(val: any) => [formatCurrency(Number(val)), 'Total']}
+                    formatter={(val: any) => [formatCurrency(Number(val), currency), 'Total']}
                     contentStyle={{
                       backgroundColor: '#1A1A24',
                       borderColor: '#2D2D3A',
@@ -292,7 +254,7 @@ export const AnalyticsView: React.FC = () => {
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-platinum">
-                        {formatCurrency(item.amount)}
+                        {formatCurrency(item.amount, currency)}
                       </span>
                       <span className="text-muted">({item.percentage}%)</span>
                     </div>

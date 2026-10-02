@@ -79,7 +79,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenSidebar, activeTab, onOpen
               className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold"
               style={{ background: 'linear-gradient(135deg, #D97706, #B45309)', color: '#000' }}
             >
-              {currentUser.name.charAt(0).toUpperCase()}
+              {(currentUser?.name ?? 'Guest').charAt(0).toUpperCase()}
             </div>
           </button>
         </div>

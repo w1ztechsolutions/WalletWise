@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { FinanceProvider } from '@/context/FinanceContext'
+import { AuthGate } from '@/components/auth/AuthGate'
 import { Navbar } from '@/components/layout/Navbar'
 import { Sidebar, type NavTab } from '@/components/layout/Sidebar'
 import { BottomNav } from '@/components/layout/BottomNav'
@@ -42,8 +43,6 @@ function AppContent() {
       className="min-h-screen flex flex-col font-sans"
       style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }}
     >
-      <ToastContainer />
-
       <Navbar
         onOpenSidebar={() => setIsSidebarOpen(true)}
         activeTab={activeTab}
@@ -90,7 +89,12 @@ function AppContent() {
 export default function App() {
   return (
     <FinanceProvider>
-      <AppContent />
+      {/* ToastContainer sits above AuthGate on purpose: sign-in failures and
+          401 teardown messages must render even when nobody is signed in. */}
+      <ToastContainer />
+      <AuthGate>
+        <AppContent />
+      </AuthGate>
     </FinanceProvider>
   )
 }

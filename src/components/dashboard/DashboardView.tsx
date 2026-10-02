@@ -21,8 +21,10 @@ import {
   Tooltip,
   Legend,
 } from 'recharts'
-import { useFinance } from '@/context/FinanceContext'
-import { formatCurrency, formatDate, getCurrentMonth } from '@/lib/utils'
+import { formatCurrency, formatDate } from '@/lib/utils'
+import { useAnalytics, type AnalyticsOverview, type AnalyticsMonthly } from '@/hooks/useAnalytics'
+import { useCategories } from '@/hooks/useCategories'
+import { useCurrency } from '@/hooks/useUser'
 
 interface DashboardViewProps {
   onNavigateTab: (tab: any) => void
@@ -45,40 +47,24 @@ const CARD_STYLE: React.CSSProperties = {
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab, onOpenAddTransaction }) => {
-  const { transactions, budgets, categories } = useFinance()
-  const currentMonth = getCurrentMonth()
+  const currency = useCurrency()
+  const { data: overview, isPending: isLoading } = useAnalytics<AnalyticsOverview>('overview')
+  const { data: monthly } = useAnalytics<AnalyticsMonthly>('monthly')
+  const { data: categories } = useCategories()
 
-  const monthTransactions = useMemo(() => {
-    return transactions.filter((t) => t.date.startsWith(currentMonth))
-  }, [transactions, currentMonth])
-
+  // Empty state until D1 answers; never render NaN from an undefined payload.
   const stats = useMemo(() => {
-    let income = 0
-    let expenses = 0
+    const income = overview?.income ?? 0
+    const expenses = overview?.expenses ?? 0
+    const netBalance = overview?.netBalance ?? 0
+    const savingsRate = overview?.savingsRate ?? 0
 
-    monthTransactions.forEach((t) => {
-      if (t.type === 'income') income += t.amount
-      else expenses += t.amount
-    })
+    const topSpending = (overview?.categorySpending ?? []).reduce(
+      (acc, row) => (row.total > acc.amount ? { name: row.category_name, amount: row.total } : acc),
+      { name: 'None', amount: 0 }
+    )
 
-    const netBalance = income - expenses
-    const savingsRate = income > 0 ? Math.max(0, Math.round(((income - expenses) / income) * 100)) : 0
-
-    const expenseByCat: Record<string, number> = {}
-    monthTransactions
-      .filter((t) => t.type === 'expense')
-      .forEach((t) => {
-        expenseByCat[t.category_name] = (expenseByCat[t.category_name] || 0) + t.amount
-      })
-
-    let topCategory = { name: 'None', amount: 0 }
-    Object.entries(expenseByCat).forEach(([name, amt]) => {
-      if (amt > topCategory.amount) topCategory = { name, amount: amt }
-    })
-
-    let totalPlanned = 0
-    const currentMonthBudgets = budgets.filter((b) => b.month === currentMonth)
-    currentMonthBudgets.forEach((b) => (totalPlanned += b.planned_amount))
+    const totalPlanned = (overview?.budgets ?? []).reduce((sum, b) => sum + b.planned_amount, 0)
 
     let budgetScore = 85
     if (totalPlanned > 0) {
@@ -90,61 +76,64 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab, onO
       budgetScore = Math.min(100, Math.max(30, Math.round((netBalance / income) * 100)))
     }
 
-    return { income, expenses, netBalance, savingsRate, budgetScore, topCategory }
-  }, [monthTransactions, budgets, currentMonth])
+    return { income, expenses, netBalance, savingsRate, budgetScore, topCategory: topSpending }
+  }, [overview])
 
   const categoryData = useMemo(() => {
-    const map = new Map<string, { name: string; value: number; color: string }>()
-    monthTransactions
-      .filter((t) => t.type === 'expense')
-      .forEach((t) => {
-        const cat = categories.find((c) => c.id === t.category_id)
-        const color = cat?.color || '#4F46E5'
-        const existing = map.get(t.category_name)
-        if (existing) existing.value += t.amount
-        else map.set(t.category_name, { name: t.category_name, value: t.amount, color })
-      })
-    return Array.from(map.values())
-  }, [monthTransactions, categories])
+    const colorFor = (name: string) =>
+      categories?.find((c) => c.name.toLowerCase() === name.toLowerCase())?.color ?? '#4F46E5'
+
+    return (overview?.categorySpending ?? []).map((row) => ({
+      name: row.category_name,
+      value: row.total,
+      color: colorFor(row.category_name),
+    }))
+  }, [overview, categories])
 
   const monthlyTrendData = useMemo(() => {
-    const result: { month: string; Income: number; Expenses: number }[] = []
-    const now = new Date()
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-      const monthStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-      const label = d.toLocaleString('en-US', { month: 'short' })
-      let mIncome = 0, mExpense = 0
-      transactions.forEach((t) => {
-        if (t.date.startsWith(monthStr)) {
-          if (t.type === 'income') mIncome += t.amount
-          else mExpense += t.amount
-        }
-      })
-      result.push({ month: label, Income: mIncome, Expenses: mExpense })
-    }
-    return result
-  }, [transactions])
+    const months = monthly?.months ?? []
+    return months.map((row) => ({
+      month: new Date(`${row.month}-01T00:00:00`).toLocaleString('en-US', { month: 'short' }),
+      Income: row.income,
+      Expenses: row.expenses,
+    }))
+  }, [monthly])
 
   const budgetProgress = useMemo(() => {
-    return budgets.filter((b) => b.month === currentMonth).map((b) => {
-      const actual = monthTransactions
-        .filter((t) => t.type === 'expense' && t.category_id === b.category_id)
-        .reduce((sum, t) => sum + t.amount, 0)
-      const cat = categories.find((c) => c.id === b.category_id)
-      const percentage = b.planned_amount > 0 ? Math.round((actual / b.planned_amount) * 100) : 0
-      return { ...b, actual, percentage, color: cat?.color || '#4F46E5', isOverBudget: actual > b.planned_amount }
-    })
-  }, [budgets, monthTransactions, categories, currentMonth])
+    const spendByName = new Map(
+      (overview?.categorySpending ?? []).map((row) => [row.category_name, row.total])
+    )
+    const colorFor = (name: string) =>
+      categories?.find((c) => c.name.toLowerCase() === name.toLowerCase())?.color ?? '#4F46E5'
 
-  const recentTransactions = useMemo(() => {
-    return [...transactions]
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-      .slice(0, 5)
-  }, [transactions])
+    return (overview?.budgets ?? []).map((b) => {
+      const actual = spendByName.get(b.category_name) ?? 0
+      const percentage = b.planned_amount > 0 ? Math.round((actual / b.planned_amount) * 100) : 0
+      return {
+        ...b,
+        actual,
+        percentage,
+        color: colorFor(b.category_name),
+        isOverBudget: actual > b.planned_amount,
+      }
+    })
+  }, [overview, categories])
+
+  const recentTransactions = useMemo(() => overview?.recentTransactions ?? [], [overview])
 
   return (
     <div className="space-y-5 pb-20 md:pb-8">
+
+      {/* D1 has not answered yet — show a placeholder rather than a zeroed dashboard. */}
+      {isLoading && (
+        <div className="flex items-center justify-center gap-3 p-10 rounded-2xl" style={CARD_STYLE}>
+          <div
+            className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin"
+            style={{ borderColor: 'var(--accent-gold)', borderTopColor: 'transparent' }}
+          />
+          <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Loading your dashboard…</span>
+        </div>
+      )}
 
       {/* ── Hero Banner */}
       <div
@@ -160,7 +149,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab, onO
             Monthly Overview
           </p>
           <p className="text-3xl sm:text-4xl font-black tracking-tight" style={{ color: 'var(--text-primary)' }}>
-            {formatCurrency(stats.netBalance)}
+            {formatCurrency(stats.netBalance, currency)}
           </p>
           <p className="text-sm mt-1 flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
             {stats.netBalance >= 0 ? (
@@ -176,12 +165,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab, onO
         >
           <div className="text-center">
             <p className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Income</p>
-            <p className="text-lg font-bold" style={{ color: 'var(--success)' }}>+{formatCurrency(stats.income)}</p>
+            <p className="text-lg font-bold" style={{ color: 'var(--success)' }}>+{formatCurrency(stats.income, currency)}</p>
           </div>
           <div className="w-px h-10" style={{ backgroundColor: 'var(--border)' }} />
           <div className="text-center">
             <p className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Expenses</p>
-            <p className="text-lg font-bold" style={{ color: 'var(--danger)' }}>-{formatCurrency(stats.expenses)}</p>
+            <p className="text-lg font-bold" style={{ color: 'var(--danger)' }}>-{formatCurrency(stats.expenses, currency)}</p>
           </div>
         </div>
       </div>
@@ -198,7 +187,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab, onO
           </div>
           <p className="text-xl sm:text-2xl font-bold mt-2 tracking-tight"
             style={{ color: stats.netBalance >= 0 ? 'var(--text-primary)' : 'var(--danger)' }}>
-            {formatCurrency(stats.netBalance)}
+            {formatCurrency(stats.netBalance, currency)}
           </p>
           <p className="text-xs font-medium mt-1 flex items-center gap-1"
             style={{ color: stats.netBalance >= 0 ? 'var(--success)' : 'var(--danger)' }}>
@@ -216,7 +205,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab, onO
             </div>
           </div>
           <p className="text-xl sm:text-2xl font-bold mt-2 tracking-tight" style={{ color: 'var(--success)' }}>
-            +{formatCurrency(stats.income)}
+            +{formatCurrency(stats.income, currency)}
           </p>
           <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>This month</p>
         </div>
@@ -230,7 +219,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab, onO
             </div>
           </div>
           <p className="text-xl sm:text-2xl font-bold mt-2 tracking-tight" style={{ color: 'var(--danger)' }}>
-            -{formatCurrency(stats.expenses)}
+            -{formatCurrency(stats.expenses, currency)}
           </p>
           <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>This month</p>
         </div>
@@ -287,7 +276,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab, onO
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value: any) => [formatCurrency(Number(value)), 'Spent']}
+                  <Tooltip formatter={(value: any) => [formatCurrency(Number(value), currency), 'Spent']}
                     contentStyle={TOOLTIP_STYLE} />
                   <Legend verticalAlign="bottom" height={36}
                     formatter={(val) => <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{val}</span>} />
@@ -308,7 +297,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab, onO
               <BarChart data={monthlyTrendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 11, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
-                <Tooltip formatter={(val: any) => [formatCurrency(Number(val)), '']}
+                <Tooltip formatter={(val: any) => [formatCurrency(Number(val), currency), '']}
                   contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
                 <Legend verticalAlign="bottom" height={36}
                   formatter={(val) => <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{val}</span>} />
@@ -356,7 +345,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab, onO
                     </div>
                     <div className="flex items-center gap-2">
                       <span style={{ color: 'var(--text-secondary)' }}>
-                        {formatCurrency(item.actual)} / {formatCurrency(item.planned_amount)}
+                        {formatCurrency(item.actual, currency)} / {formatCurrency(item.planned_amount, currency)}
                       </span>
                       {item.isOverBudget && (
                         <span className="flex items-center gap-0.5 font-semibold" style={{ color: 'var(--danger)' }}>
@@ -433,7 +422,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab, onO
                   </div>
                   <span className="text-sm font-bold shrink-0 ml-3"
                     style={{ color: tx.type === 'income' ? 'var(--success)' : 'var(--text-primary)' }}>
-                    {tx.type === 'income' ? '+' : '-'}{formatCurrency(tx.amount)}
+                    {tx.type === 'income' ? '+' : '-'}{formatCurrency(tx.amount, currency)}
                   </span>
                 </div>
               ))}

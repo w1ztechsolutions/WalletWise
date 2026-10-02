@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
+import { analyticsKeys } from "@/hooks/useAnalytics";
 import type { Transaction } from "@/types";
 
 export const transactionKeys = {
@@ -33,6 +34,17 @@ export function useTransactions(filters?: TransactionFilters) {
   });
 }
 
+/**
+ * A transaction write changes more than the list: the dashboard's month
+ * snapshot and the analytics page's lifetime totals are all derived from the
+ * same rows on the server. Invalidating only `transactions` would leave those
+ * screens showing pre-write numbers until a manual reload.
+ */
+function invalidateAfterTransactionWrite(queryClient: ReturnType<typeof useQueryClient>) {
+  queryClient.invalidateQueries({ queryKey: transactionKeys.all });
+  queryClient.invalidateQueries({ queryKey: analyticsKeys.all });
+}
+
 export function useAddTransaction() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -41,9 +53,7 @@ export function useAddTransaction() {
         method: "POST",
         body: JSON.stringify(data),
       }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: transactionKeys.all });
-    },
+    onSuccess: () => invalidateAfterTransactionWrite(queryClient),
   });
 }
 
@@ -55,9 +65,7 @@ export function useUpdateTransaction() {
         method: "PUT",
         body: JSON.stringify(data),
       }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: transactionKeys.all });
-    },
+    onSuccess: () => invalidateAfterTransactionWrite(queryClient),
   });
 }
 
@@ -68,8 +76,6 @@ export function useDeleteTransaction() {
       apiFetch<{ success: boolean }>(`/transactions/${id}`, {
         method: "DELETE",
       }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: transactionKeys.all });
-    },
+    onSuccess: () => invalidateAfterTransactionWrite(queryClient),
   });
 }

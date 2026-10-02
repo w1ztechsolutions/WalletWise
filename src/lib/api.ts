@@ -1,5 +1,15 @@
 const BASE_URL = "/api";
 
+/**
+ * Broadcast on `window` when any `/api/*` response comes back `401`.
+ *
+ * `functions/_middleware.ts` rejects every data route without a session, so a
+ * 401 means "the session expired or was revoked", never "bad request".
+ * `AuthGate` listens for this and tears the session down in one place instead
+ * of each hook guessing at retry configuration.
+ */
+export const UNAUTHORIZED_EVENT = "walletwise:unauthorized";
+
 interface ApiOptions extends RequestInit {
   params?: Record<string, string>;
 }
@@ -32,6 +42,9 @@ export async function apiFetch<T>(
   });
 
   if (!res.ok) {
+    if (res.status === 401) {
+      window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
+    }
     const body = (await res.json().catch(() => ({}))) as Record<string, string>;
     throw new Error(body.error || `Request failed with status ${res.status}`);
   }

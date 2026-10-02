@@ -1,6 +1,7 @@
 import { eq, and, like, desc } from "drizzle-orm";
 import { transactions, categories } from "../../../src/db/schema";
 import { createDb, getAuthUser, json, error } from "../../lib/helpers";
+import { validateTransactionRow } from "../../lib/validation";
 
 interface Env {
   DB: D1Database;
@@ -55,19 +56,9 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     return error("Invalid JSON body");
   }
 
-  const { date, amount, description, category_id, category_name, type, is_recurring, notes } = body;
-
-  if (!date || typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    return error("Invalid date. Expected YYYY-MM-DD format.");
-  }
-  if (typeof amount !== "number" || amount <= 0) {
-    return error("Amount must be a positive number.");
-  }
-  if (typeof type !== "string" || !["income", "expense"].includes(type)) {
-    return error("Type must be 'income' or 'expense'.");
-  }
-  if (typeof category_name !== "string" || !category_name.trim()) {
-    return error("Category name is required.");
+  const validated = validateTransactionRow(body);
+  if (!validated.ok) {
+    return error(validated.reason);
   }
 
   const db = createDb(context.env);
@@ -78,14 +69,14 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     .values({
       id,
       created_by_id: user.id,
-      date,
-      amount,
-      description: typeof description === "string" ? description : "",
-      category_id: typeof category_id === "string" ? category_id : null,
-      category_name: category_name.trim(),
-      type: type as "income" | "expense",
-      is_recurring: typeof is_recurring === "boolean" ? is_recurring : false,
-      notes: typeof notes === "string" ? notes : null,
+      date: validated.value.date,
+      amount: validated.value.amount,
+      description: validated.value.description,
+      category_id: validated.value.category_id,
+      category_name: validated.value.category_name,
+      type: validated.value.type,
+      is_recurring: validated.value.is_recurring,
+      notes: validated.value.notes,
     })
     .returning();
 

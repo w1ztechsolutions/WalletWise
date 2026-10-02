@@ -1,4 +1,5 @@
 import React from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   LayoutDashboard,
   Receipt,
@@ -10,6 +11,7 @@ import {
   X,
 } from 'lucide-react'
 import { useFinance } from '@/context/FinanceContext'
+import { authClient } from '@/lib/auth-client'
 
 export type NavTab = 'dashboard' | 'transactions' | 'accounts' | 'budgets' | 'analytics' | 'settings'
 
@@ -30,13 +32,20 @@ export const NAV_ITEMS: { id: NavTab; label: string; icon: React.ComponentType<{
 ]
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, activeTab, onSelectTab }) => {
-  const { currentUser, setCurrentUser, addToast } = useFinance()
+  const { currentUser, addToast } = useFinance()
+  const queryClient = useQueryClient()
 
-  const handleSignOut = () => {
-    addToast('Signed out', 'Session terminated. Switched to guest.', 'info')
-    setCurrentUser({ id: `usr_${Date.now()}`, name: 'Guest User', email: 'guest@walletwise.app' })
+  const handleSignOut = async () => {
+    // Order matters: drop the cache before the cookie so no cached row can be
+    // rendered against the signed-out shell, then confirm with the server.
+    queryClient.clear()
+    await authClient.signOut()
+    addToast('Signed out', 'Your session has been terminated.', 'info')
     onClose()
   }
+
+  const displayName = currentUser?.name ?? 'Guest'
+  const displayEmail = currentUser?.email ?? ''
 
   return (
     <>
@@ -91,14 +100,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, activeTab, on
             className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0"
             style={{ background: 'linear-gradient(135deg, #D97706, #B45309)', color: '#000' }}
           >
-            {currentUser.name.charAt(0).toUpperCase()}
+            {displayName.charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
-              {currentUser.name}
+              {displayName}
             </p>
             <p className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>
-              {currentUser.email}
+              {displayEmail}
             </p>
           </div>
         </div>

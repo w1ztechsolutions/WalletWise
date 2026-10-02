@@ -20,7 +20,22 @@ import { formatCurrency, getCurrentMonth } from '@/lib/utils'
 import { apiFetch } from '@/lib/api'
 import { validateFileForKind } from '@/lib/storagePolicy'
 import { normalizeSheets, type RawBudget, type RawTransaction } from '@/lib/importParser'
-import type { Category, TransactionType, Transaction, Budget } from '@/types'
+import {
+  useCategories,
+  useAddCategory,
+  useUpdateCategory,
+  useDeleteCategory,
+} from '@/hooks/useCategories'
+import { useTransactions } from '@/hooks/useTransactions'
+import { useCurrency } from '@/hooks/useUser'
+import {
+  useBulkImport,
+  type ImportPayload,
+  type ImportPreview,
+  type DuplicateDecision,
+} from '@/hooks/useBulkImport'
+import { ImportReviewModal } from './ImportReviewModal'
+import type { Category, TransactionType } from '@/types'
 
 const PRESET_CATEGORY_COLORS = [
   '#10b981',
@@ -57,17 +72,14 @@ interface ImportSheet {
 }
 
 export const SettingsView: React.FC = () => {
-  const {
-    categories,
-    transactions,
-    budgets,
-    addCategory,
-    updateCategory,
-    deleteCategory,
-    batchImport,
-    addToast,
-    currentUser,
-  } = useFinance()
+  const { addToast } = useFinance()
+  const currency = useCurrency()
+  const { data: categories = [] } = useCategories()
+  const { data: transactions = [] } = useTransactions()
+  const { mutate: createCategory } = useAddCategory()
+  const { mutate: saveCategory, isPending: isSavingCategory } = useUpdateCategory()
+  const { mutate: removeCategory } = useDeleteCategory()
+  const { previewImportAsync, commitImport, isCommitting: isCommittingImport } = useBulkImport()
 
   // Tab
   const [activeSettingsTab, setActiveSettingsTab] = useState<'categories' | 'import' | 'reports'>('categories')
@@ -95,6 +107,9 @@ export const SettingsView: React.FC = () => {
   const [isImporting, setIsImporting] = useState(false)
   const [importStatus, setImportStatus] = useState<string | null>(null)
   const [importProgress, setImportProgress] = useState<{ transactionsCount: number; budgetsCount: number } | null>(null)
+  // Rows awaiting review + the server's classification of them.
+  const [pendingImport, setPendingImport] = useState<ImportPayload | null>(null)
+  const [importPreview, setImportPreview] = useState<ImportPreview | null>(null)
 
   // Handlers for Categories
   const openEditCategory = (cat: Category) => {
@@ -112,19 +127,40 @@ export const SettingsView: React.FC = () => {
     e.preventDefault()
     if (!categoryFormData.name.trim()) return
 
+    const payload = {
+      name: categoryFormData.name.trim(),
+      type: categoryFormData.type,
+      color: categoryFormData.color,
+    }
+
     if (editingCategory) {
-      updateCategory(editingCategory.id, {
-        name: categoryFormData.name.trim(),
-        type: categoryFormData.type,
-        color: categoryFormData.color,
-      })
+      saveCategory(
+        { id: editingCategory.id, ...payload },
+        {
+          onSuccess: () =>
+            addToast('Category updated', 'Category details were updated successfully.', 'success'),
+          onError: (err: unknown) =>
+            addToast(
+              'Unable to update category',
+              err instanceof Error ? err.message : 'Please try again.',
+              'error'
+            ),
+        }
+      )
     } else {
-      addCategory({
-        name: categoryFormData.name.trim(),
-        type: categoryFormData.type,
-        color: categoryFormData.color,
-        icon: 'Tag',
-      })
+      createCategory(
+        { ...payload, icon: 'Tag' },
+        {
+          onSuccess: () =>
+            addToast('Category created', `"${payload.name}" has been added.`, 'success'),
+          onError: (err: unknown) =>
+            addToast(
+              'Unable to create category',
+              err instanceof Error ? err.message : 'Please try again.',
+              'error'
+            ),
+        }
+      )
     }
     setIsCategoryModalOpen(false)
     setEditingCategory(null)
@@ -133,6 +169,26 @@ export const SettingsView: React.FC = () => {
       type: 'expense',
       color: PRESET_CATEGORY_COLORS[0],
       icon: 'Tag',
+    })
+  }
+
+  /**
+   * Category deletion is guarded client-side only — nothing server-side stops a
+   * category from being orphaned mid-write, so the transaction list check stays.
+   */
+  const handleDeleteCategory = (id: string) => {
+    if (transactions.some((t) => t.category_id === id)) {
+      addToast('Cannot delete category', 'Transactions are currently linked to this category.', 'error')
+      return
+    }
+    removeCategory(id, {
+      onSuccess: () => addToast('Category removed', 'Category was deleted.', 'info'),
+      onError: (err: unknown) =>
+        addToast(
+          'Unable to remove category',
+          err instanceof Error ? err.message : 'Please try again.',
+          'error'
+        ),
     })
   }
 
@@ -221,55 +277,90 @@ export const SettingsView: React.FC = () => {
 
       // 4. Resolve categories by name (create missing ones once).
       setImportStatus('Matching categories...')
-      const categoryCache = new Map<string, Category>()
-      const resolveCategory = (name: string, type: TransactionType): Category => {
-        const key = name.trim().toLowerCase()
-        const cached = categoryCache.get(key)
-        if (cached) return cached
-        const existing = categories.find((c) => c.name.toLowerCase() === key)
-        if (existing) {
-          categoryCache.set(key, existing)
-          return existing
-        }
-        const created = addCategory({
-          name: name.trim() || 'General',
-          type,
-          color: PRESET_CATEGORY_COLORS[Math.floor(Math.random() * PRESET_CATEGORY_COLORS.length)],
-          icon: 'Tag',
-        })
-        categoryCache.set(key, created)
-        return created
+
+      // Categories are matched by name. Any category the sheet references but the
+      // account does not have must exist in D1 *before* the import rows are
+      // built — `transactions.category_id` is a real foreign key, so a
+      // placeholder id here would fail the insert. Create them all first, then
+      // map rows onto the returned ids.
+      const desired = new Map<string, TransactionType>()
+      for (const t of result.transactions) {
+        const key = t.category.trim().toLowerCase()
+        if (!desired.has(key)) desired.set(key, t.type)
+      }
+      for (const b of result.budgets) {
+        const key = b.category.trim().toLowerCase()
+        if (!desired.has(key)) desired.set(key, 'expense')
       }
 
-      const extractedTransactions: Omit<Transaction, 'id' | 'created_by_id'>[] =
-        result.transactions.map((t) => {
-          const cat = resolveCategory(t.category, t.type)
-          return {
-            date: t.date,
-            amount: t.amount,
-            description: t.description,
-            category_id: cat.id,
-            category_name: cat.name,
-            type: t.type,
-            is_recurring: t.is_recurring,
-            notes: `Imported from ${file.name}`,
-          }
-        })
+      const resolved = new Map<string, Category>()
+      const missing: { name: string; type: TransactionType }[] = []
 
-      const extractedBudgets: Omit<Budget, 'id' | 'created_by_id'>[] = result.budgets.map((b) => {
-        const cat = resolveCategory(b.category, 'expense')
+      for (const [key, type] of desired) {
+        const existing = categories.find((c) => c.name.toLowerCase() === key)
+        if (existing) resolved.set(key, existing)
+        else missing.push({ name: key || 'general', type })
+      }
+
+      await Promise.all(
+        missing.map(({ name, type }) =>
+          new Promise<void>((resolve) => {
+            createCategory(
+              {
+                name: name.charAt(0).toUpperCase() + name.slice(1),
+                type,
+                color: PRESET_CATEGORY_COLORS[resolved.size % PRESET_CATEGORY_COLORS.length],
+                icon: 'Tag',
+              },
+              {
+                onSuccess: (created) => {
+                  resolved.set(name, created)
+                  resolve()
+                },
+                onError: (err: unknown) => {
+                  addToast(
+                    'Category not created',
+                    `"${name}" could not be created (${
+                      err instanceof Error ? err.message : 'unknown error'
+                    }); its rows will be imported without a category link.`,
+                    'warning'
+                  )
+                  resolve()
+                },
+              }
+            )
+          })
+        )
+      )
+
+      const lookupCategory = (name: string): Category | null => {
+        const key = (name.trim() || 'general').toLowerCase()
+        return resolved.get(key) ?? categories.find((c) => c.name.toLowerCase() === key) ?? null
+      }
+
+      const extractedTransactions = result.transactions.map((t) => {
+        const cat = lookupCategory(t.category)
         return {
-          month: b.month,
-          category_id: cat.id,
-          category_name: cat.name,
-          planned_amount: b.planned_amount,
+          date: t.date,
+          amount: t.amount,
+          description: t.description,
+          category_id: cat?.id ?? '',
+          category_name: cat?.name ?? (t.category || 'General'),
+          type: t.type,
+          is_recurring: t.is_recurring,
           notes: `Imported from ${file.name}`,
         }
       })
 
-      setImportProgress({
-        transactionsCount: extractedTransactions.length,
-        budgetsCount: extractedBudgets.length,
+      const extractedBudgets = result.budgets.map((b) => {
+        const cat = lookupCategory(b.category)
+        return {
+          month: b.month,
+          category_id: cat?.id ?? '',
+          category_name: cat?.name ?? (b.category || 'General'),
+          planned_amount: b.planned_amount,
+          notes: `Imported from ${file.name}`,
+        }
       })
 
       if (result.warnings.length > 0) {
@@ -281,10 +372,14 @@ export const SettingsView: React.FC = () => {
       }
 
       if (extractedTransactions.length > 0 || extractedBudgets.length > 0) {
-        batchImport({
+        setImportStatus('Checking for duplicates...')
+        const payload: ImportPayload = {
           transactions: extractedTransactions,
           budgets: extractedBudgets,
-        })
+        }
+        const preview = await previewImportAsync(payload)
+        setPendingImport(payload)
+        setImportPreview(preview)
       } else {
         addToast('No records found', 'The spreadsheet did not contain recognized columns.', 'info')
       }
@@ -294,6 +389,51 @@ export const SettingsView: React.FC = () => {
       setIsImporting(false)
       setImportStatus(null)
     }
+  }
+
+  const handleConfirmImport = (decisions: Record<string, DuplicateDecision>) => {
+    if (!pendingImport) return
+    commitImport(
+      { ...pendingImport, decisions },
+      {
+        onSuccess: (result) => {
+          const importedTx = result.inserted.transactions
+          const importedBg = result.inserted.budgets
+          const replaced = result.replaced.transactions + result.replaced.budgets
+
+          setImportProgress({ transactionsCount: importedTx, budgetsCount: importedBg })
+          addToast(
+            'Import completed',
+            `Imported ${importedTx} transactions and ${importedBg} budgets${
+              replaced > 0 ? `, replaced ${replaced} existing` : ''
+            }.`,
+            'success'
+          )
+          if (result.invalid.length > 0) {
+            addToast(
+              'Rows skipped',
+              `${result.invalid.length} invalid row${
+                result.invalid.length === 1 ? '' : 's'
+              } could not be imported.`,
+              'warning'
+            )
+          }
+          setPendingImport(null)
+          setImportPreview(null)
+        },
+        onError: (err: unknown) =>
+          addToast(
+            'Import failed',
+            err instanceof Error ? err.message : 'Please try again.',
+            'error'
+          ),
+      }
+    )
+  }
+
+  const cancelImport = () => {
+    setPendingImport(null)
+    setImportPreview(null)
   }
 
   // Download CSV Template
@@ -457,7 +597,7 @@ export const SettingsView: React.FC = () => {
                     <Edit2 className="w-3.5 h-3.5" />
                   </button>
                   <button
-                    onClick={() => deleteCategory(cat.id)}
+                    onClick={() => handleDeleteCategory(cat.id)}
                     className="p-1.5 text-muted hover:text-danger rounded-lg hover:bg-danger/10"
                     title="Delete category"
                   >
@@ -626,7 +766,7 @@ export const SettingsView: React.FC = () => {
               <div>
                 <span className="text-[11px] text-muted">Total Volume</span>
                 <p className="text-base font-bold text-platinum">
-                  {formatCurrency(filteredReport.reduce((sum, t) => sum + t.amount, 0))}
+                  {formatCurrency(filteredReport.reduce((sum, t) => sum + t.amount, 0), currency)}
                 </p>
               </div>
             </div>
@@ -741,14 +881,25 @@ export const SettingsView: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 text-xs font-semibold bg-gold hover:bg-gold-hover text-ink shadow-gold rounded-xl"
+                  disabled={isSavingCategory}
+                  className="px-5 py-2 text-xs font-semibold bg-gold hover:bg-gold-hover text-ink shadow-gold rounded-xl disabled:opacity-60 disabled:cursor-wait"
                 >
-                  Save Category
+                  {isSavingCategory ? 'Saving…' : 'Save Category'}
                 </button>
               </div>
             </form>
           </div>
         </div>
+      )}
+
+      {/* Import review — the only place rows reach D1 */}
+      {pendingImport && importPreview && (
+        <ImportReviewModal
+          preview={importPreview}
+          isCommitting={isCommittingImport}
+          onCancel={cancelImport}
+          onConfirm={handleConfirmImport}
+        />
       )}
     </div>
   )

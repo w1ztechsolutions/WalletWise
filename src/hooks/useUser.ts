@@ -28,3 +28,15 @@ export function useUpdateUser() {
     },
   });
 }
+
+/**
+ * The active user's ISO currency code, e.g. `MWK`.
+ *
+ * Every `formatCurrency` call site needs this, otherwise the Phase 6.1
+ * preference is silently inert and all views keep formatting in the default
+ * currency. Falls back to `MWK` until `/user/me` resolves.
+ */
+export function useCurrency(): string {
+  const { data } = useUser();
+  return data?.currency ?? "MWK";
+}

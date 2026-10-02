@@ -12,8 +12,10 @@ import {
   X,
   CreditCard,
 } from 'lucide-react'
-import { useFinance } from '@/context/FinanceContext'
 import { formatCurrency } from '@/lib/utils'
+import { useAccounts, useAddAccount, useUpdateAccount, useDeleteAccount } from '@/hooks/useAccounts'
+import { useCurrency } from '@/hooks/useUser'
+import { useFinance } from '@/context/FinanceContext'
 import type { Account, AccountType } from '@/types'
 
 const PRESET_INSTITUTIONS: Record<AccountType, string[]> = {
@@ -25,7 +27,12 @@ const PRESET_INSTITUTIONS: Record<AccountType, string[]> = {
 const PRESET_COLORS = ['#4f46e5', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#64748b']
 
 export const AccountsView: React.FC = () => {
-  const { accounts, addAccount, updateAccount, deleteAccount } = useFinance()
+  const { addToast } = useFinance()
+  const currency = useCurrency()
+  const { data: accounts = [], isPending: isLoading } = useAccounts()
+  const { mutate: createAccount, isPending: isCreating } = useAddAccount()
+  const { mutate: saveAccount, isPending: isUpdating } = useUpdateAccount()
+  const { mutate: removeAccount } = useDeleteAccount()
 
   const [activeTab, setActiveTab] = useState<'all' | AccountType>('all')
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -93,27 +100,37 @@ export const AccountsView: React.FC = () => {
       masked = 'N/A'
     }
 
+    const payload = {
+      name: formData.name.trim(),
+      type: formData.type,
+      institution: formData.institution.trim(),
+      account_number: masked,
+      balance: bal,
+      color: formData.color,
+      notes: formData.notes.trim(),
+      is_active: formData.is_active,
+    }
+
+    const onError = (err: unknown) => {
+      addToast(
+        'Unable to save account',
+        err instanceof Error ? err.message : 'Please try again.',
+        'error'
+      )
+    }
+
     if (editingAccount) {
-      updateAccount(editingAccount.id, {
-        name: formData.name.trim(),
-        type: formData.type,
-        institution: formData.institution.trim(),
-        account_number: masked,
-        balance: bal,
-        color: formData.color,
-        notes: formData.notes.trim(),
-        is_active: formData.is_active,
-      })
+      saveAccount(
+        { id: editingAccount.id, ...payload },
+        {
+          onSuccess: () => addToast('Account updated', 'Account details saved.', 'success'),
+          onError,
+        }
+      )
     } else {
-      addAccount({
-        name: formData.name.trim(),
-        type: formData.type,
-        institution: formData.institution.trim(),
-        account_number: masked,
-        balance: bal,
-        color: formData.color,
-        notes: formData.notes.trim(),
-        is_active: formData.is_active,
+      createAccount(payload, {
+        onSuccess: () => addToast('Account created', `Added "${payload.name}"`, 'success'),
+        onError,
       })
     }
 
@@ -159,6 +176,14 @@ export const AccountsView: React.FC = () => {
 
   return (
     <div className="space-y-6 pb-20 md:pb-6">
+      {/* Loading placeholder so the net-worth header never flashes a fake 0 */}
+      {isLoading && (
+        <div className="flex items-center justify-center gap-3 py-10 rounded-3xl bg-surface border border-hairline">
+          <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin border-gold" />
+          <span className="text-xs text-muted">Loading your accounts…</span>
+        </div>
+      )}
+
       {/* Net Worth Summary Header */}
       <div className="rounded-3xl p-6 sm:p-8 shadow-xl relative overflow-hidden bg-gradient-to-br from-surface-2 via-surface to-ink border border-hairline border-t-2 border-t-gold/60">
         <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-gold/10 blur-3xl pointer-events-none" />
@@ -168,22 +193,22 @@ export const AccountsView: React.FC = () => {
               Total Net Worth (Active Accounts)
             </span>
             <p className="text-platinum text-3xl sm:text-4xl font-extrabold mt-1 tracking-tight">
-              {formatCurrency(totals.totalNetWorth)}
+              {formatCurrency(totals.totalNetWorth, currency)}
             </p>
           </div>
 
           <div className="grid grid-cols-3 gap-4 pt-4 md:pt-0 border-t border-hairline md:border-t-0 md:border-l md:pl-8">
             <div>
               <span className="text-[11px] text-muted">Bank Accounts</span>
-              <p className="text-platinum text-sm sm:text-base font-bold mt-0.5">{formatCurrency(totals.bankTotal)}</p>
+              <p className="text-platinum text-sm sm:text-base font-bold mt-0.5">{formatCurrency(totals.bankTotal, currency)}</p>
             </div>
             <div>
               <span className="text-[11px] text-muted">Mobile Money</span>
-              <p className="text-platinum text-sm sm:text-base font-bold mt-0.5">{formatCurrency(totals.mobileTotal)}</p>
+              <p className="text-platinum text-sm sm:text-base font-bold mt-0.5">{formatCurrency(totals.mobileTotal, currency)}</p>
             </div>
             <div>
               <span className="text-[11px] text-muted">Cash</span>
-              <p className="text-platinum text-sm sm:text-base font-bold mt-0.5">{formatCurrency(totals.cashTotal)}</p>
+              <p className="text-platinum text-sm sm:text-base font-bold mt-0.5">{formatCurrency(totals.cashTotal, currency)}</p>
             </div>
           </div>
         </div>
@@ -279,7 +304,7 @@ export const AccountsView: React.FC = () => {
 
               <div className="mt-5 flex items-baseline justify-between">
                 <span className="text-xl sm:text-2xl font-black text-platinum tracking-tight">
-                  {formatCurrency(acc.balance)}
+                  {formatCurrency(acc.balance, currency)}
                 </span>
                 <span className="text-xs font-mono text-muted">
                   {acc.account_number}
@@ -487,9 +512,14 @@ export const AccountsView: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 text-xs font-semibold bg-gold hover:bg-gold-hover text-ink shadow-gold rounded-xl"
+                  disabled={isCreating || isUpdating}
+                  className="px-5 py-2 text-xs font-semibold bg-gold hover:bg-gold-hover text-ink shadow-gold rounded-xl disabled:opacity-60 disabled:cursor-wait"
                 >
-                  {editingAccount ? 'Update Account' : 'Create Account'}
+                  {isCreating || isUpdating
+                    ? 'Saving…'
+                    : editingAccount
+                      ? 'Update Account'
+                      : 'Create Account'}
                 </button>
               </div>
             </form>
@@ -516,7 +546,15 @@ export const AccountsView: React.FC = () => {
               </button>
               <button
                 onClick={() => {
-                  deleteAccount(deletingId)
+                  removeAccount(deletingId, {
+                    onSuccess: () => addToast('Account removed', 'Account deleted successfully.', 'info'),
+                    onError: (err: unknown) =>
+                      addToast(
+                        'Unable to remove account',
+                        err instanceof Error ? err.message : 'Please try again.',
+                        'error'
+                      ),
+                  })
                   setDeletingId(null)
                 }}
                 className="px-4 py-2 text-xs font-semibold bg-danger hover:bg-danger/90 text-ink rounded-xl"
