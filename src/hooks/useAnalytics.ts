@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, useRetry } from "@/lib/api";
 import type { Budget, Transaction } from "@/types";
 
 export type AnalyticsView = "overview" | "monthly" | "all-time";
@@ -44,5 +44,6 @@ export function useAnalytics<T = AnalyticsOverview>(view: AnalyticsView) {
   return useQuery({
     queryKey: analyticsKeys.view(view),
     queryFn: () => apiFetch<T>("/analytics", { params: { view } }),
+    retry: useRetry,
   });
 }

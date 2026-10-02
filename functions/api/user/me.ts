@@ -3,14 +3,16 @@ import { drizzle } from "drizzle-orm/d1";
 import { user } from "../../../src/db/schema";
 import { createAuth } from "../../../src/lib/auth";
 import { json, error } from "../../lib/helpers";
+import { withErrorHandling } from "../../lib/errors";
 
 interface Env {
   DB: D1Database;
   STORAGE: R2Bucket;
   AI: Ai;
+  ENVIRONMENT?: string;
 }
 
-export const onRequestGet: PagesFunction<Env> = async (context) => {
+export const onRequestGet: PagesFunction<Env> = withErrorHandling(async (context) => {
   const auth = createAuth(context.env.DB);
   const session = await auth.api.getSession({
     headers: context.request.headers,
@@ -31,9 +33,9 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     avatar_url: image ?? undefined,
     currency,
   });
-};
+});
 
-export const onRequestPatch: PagesFunction<Env> = async (context) => {
+export const onRequestPatch: PagesFunction<Env> = withErrorHandling(async (context) => {
   const auth = createAuth(context.env.DB);
   const session = await auth.api.getSession({
     headers: context.request.headers,
@@ -100,4 +102,4 @@ export const onRequestPatch: PagesFunction<Env> = async (context) => {
     avatar_url: image ?? undefined,
     currency,
   });
-};
+});

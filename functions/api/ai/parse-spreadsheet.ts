@@ -1,5 +1,6 @@
 import type { Env } from "../../../src/types/env";
 import { error, getAuthUser, json } from "../../lib/helpers";
+import { withErrorHandling } from "../../lib/errors";
 import {
   isValidIsoDate,
   isValidIsoMonth,
@@ -311,7 +312,7 @@ async function runAiChunk(
   return null;
 }
 
-export const onRequestPost: PagesFunction<Env> = async (context) => {
+export const onRequestPost: PagesFunction<Env> = withErrorHandling(async (context) => {
   const injected = typeof context.data.userId === "string" ? context.data.userId : "";
   const userId = injected || (await getAuthUser(context.env, context.request))?.id;
   if (!userId) return error("Unauthorized", 401);
@@ -377,7 +378,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   const source = stats.aiChunks === 0 ? "fallback" : stats.fallbackChunks === 0 ? "ai" : "mixed";
 
   return json({ transactions, budgets, warnings, stats, source, fileName });
-};
+});
 
 
 

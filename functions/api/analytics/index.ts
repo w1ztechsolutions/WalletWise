@@ -1,14 +1,16 @@
 import { eq, sql } from "drizzle-orm";
 import { transactions, budgets, categories } from "../../../src/db/schema";
 import { createDb, getAuthUser, json, error } from "../../lib/helpers";
+import { withErrorHandling } from "../../lib/errors";
 
 interface Env {
   DB: D1Database;
   STORAGE: R2Bucket;
   AI: Ai;
+  ENVIRONMENT?: string;
 }
 
-export const onRequestGet: PagesFunction<Env> = async (context) => {
+export const onRequestGet: PagesFunction<Env> = withErrorHandling(async (context) => {
   const user = await getAuthUser(context.env, context.request);
   if (!user) return error("Unauthorized", 401);
 
@@ -145,4 +147,4 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   }
 
   return error("Unknown view. Use 'overview', 'monthly', or 'all-time'.", 400);
-};
+});

@@ -1,14 +1,16 @@
 import { eq, and } from "drizzle-orm";
 import { budgets } from "../../../src/db/schema";
 import { createDb, getAuthUser, json, error } from "../../lib/helpers";
+import { withErrorHandling } from "../../lib/errors";
 
 interface Env {
   DB: D1Database;
   STORAGE: R2Bucket;
   AI: Ai;
+  ENVIRONMENT?: string;
 }
 
-export const onRequestGet: PagesFunction<Env> = async (context) => {
+export const onRequestGet: PagesFunction<Env> = withErrorHandling(async (context) => {
   const user = await getAuthUser(context.env, context.request);
   if (!user) return error("Unauthorized", 401);
 
@@ -24,9 +26,9 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
 
   if (!row.length) return error("Budget not found.", 404);
   return json(row[0]);
-};
+});
 
-export const onRequestPut: PagesFunction<Env> = async (context) => {
+export const onRequestPut: PagesFunction<Env> = withErrorHandling(async (context) => {
   const user = await getAuthUser(context.env, context.request);
   if (!user) return error("Unauthorized", 401);
 
@@ -81,9 +83,9 @@ export const onRequestPut: PagesFunction<Env> = async (context) => {
 
   if (!result.length) return error("Budget not found.", 404);
   return json(result[0]);
-};
+});
 
-export const onRequestDelete: PagesFunction<Env> = async (context) => {
+export const onRequestDelete: PagesFunction<Env> = withErrorHandling(async (context) => {
   const user = await getAuthUser(context.env, context.request);
   if (!user) return error("Unauthorized", 401);
 
@@ -96,4 +98,4 @@ export const onRequestDelete: PagesFunction<Env> = async (context) => {
     .where(and(eq(budgets.id, id), eq(budgets.created_by_id, user.id)));
 
   return json({ success: true });
-};
+});

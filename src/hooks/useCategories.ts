@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, useRetry } from "@/lib/api";
 import type { Category } from "@/types";
 
 export const categoryKeys = {
@@ -16,6 +16,7 @@ export function useCategories(type?: string) {
       apiFetch<Category[]>("/categories", {
         params: type ? { type } : undefined,
       }),
+    retry: useRetry,
   });
 }
 

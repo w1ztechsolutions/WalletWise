@@ -1,6 +1,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { transactions, budgets } from "../../../src/db/schema";
 import { createDb, getAuthUser, json, error } from "../../lib/helpers";
+import { withErrorHandling } from "../../lib/errors";
 import {
   validateTransactionRow,
   validateBudgetRow,
@@ -14,6 +15,7 @@ interface Env {
   DB: D1Database;
   STORAGE: R2Bucket;
   AI: Ai;
+  ENVIRONMENT?: string;
 }
 
 /** Rows are written in chunks so a wide sheet cannot exhaust D1's per-request query budget. */
@@ -85,7 +87,7 @@ function chunk<T>(items: T[], size: number): T[][] {
  * keys the client echoes back in `skip`/`replace` cannot be forged to target
  * another user's row: the lookups are always scoped to the caller's id.
  */
-export const onRequestPost: PagesFunction<Env> = async (context) => {
+export const onRequestPost: PagesFunction<Env> = withErrorHandling(async (context) => {
   const user = await getAuthUser(context.env, context.request);
   if (!user) return error("Unauthorized", 401);
 
@@ -329,4 +331,4 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     invalid,
   };
   return json(response);
-};
+});

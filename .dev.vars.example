@@ -19,5 +19,21 @@ R2_ACCOUNT_ID=your-cloudflare-account-id
 R2_ACCESS_KEY_ID=your-r2-access-key-id
 R2_SECRET_ACCESS_KEY=your-r2-secret-access-key
 
+# "development" is the only value that exposes `details` in API error
+# responses (functions/lib/errors.ts). Anything else — including a
+# missing value — fails closed to production-safe output (SECURITY.md §7).
+# Production deployments should leave this unset or set it to "production".
+ENVIRONMENT=development
+
 # Optional local override (normally provided by wrangler.jsonc `vars`):
 # R2_BUCKET_NAME=walletwise-storage
+
+# Runtime marker read by `functions/lib/errors.ts`.
+#
+# "development" is the ONLY value that returns `details` (stack traces, D1
+# error text) in HTTP error responses. Any other value — including a missing
+# binding — is treated as production and stays fully sanitized.
+#
+# This is exactly why you want it in `.dev.vars`: `wrangler pages dev` reads
+# this file and overrides the `"production"` default in `wrangler.jsonc`.
+ENVIRONMENT=development

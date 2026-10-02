@@ -1,5 +1,6 @@
 import type { Env } from "../../../src/types/env";
 import { error, getAuthUser, json } from "../../lib/helpers";
+import { withErrorHandling } from "../../lib/errors";
 import {
   buildObjectKey,
   parseUploadRequest,
@@ -12,7 +13,7 @@ import {
  * POST /api/storage/upload-url
  * Issues a 15-minute presigned PUT URL for a private, user-scoped R2 key.
  */
-export const onRequestPost: PagesFunction<Env> = async (context) => {
+export const onRequestPost: PagesFunction<Env> = withErrorHandling(async (context) => {
   const injected = typeof context.data.userId === "string" ? context.data.userId : "";
   const userId = injected || (await getAuthUser(context.env, context.request))?.id;
   if (!userId) return error("Unauthorized", 401);
@@ -46,4 +47,4 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     console.error("Failed to issue upload URL:", err);
     return error("Unable to prepare upload. Please try again.", 500);
   }
-};
+});

@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, useRetry } from "@/lib/api";
 import { analyticsKeys } from "@/hooks/useAnalytics";
 import type { Transaction } from "@/types";
 
@@ -31,6 +31,7 @@ export function useTransactions(filters?: TransactionFilters) {
             )
           : undefined,
       }),
+    retry: useRetry,
   });
 }
 

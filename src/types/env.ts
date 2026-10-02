@@ -26,5 +26,13 @@ export interface Env {
   R2_SECRET_ACCESS_KEY?: string
   /** Plain (non-secret) variable defined in `wrangler.jsonc`. */
   R2_BUCKET_NAME?: string
+  /**
+   * Runtime environment marker used by `functions/lib/errors.ts`.
+   *
+   * `"development"` is the only value that exposes `details` in error
+   * responses; every other value (including `undefined`) is treated as
+   * production. Set per-runtime in `wrangler.jsonc` and `.dev.vars`.
+   */
+  ENVIRONMENT?: string
 }
 

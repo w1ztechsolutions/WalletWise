@@ -1,5 +1,6 @@
 import type { Env } from "../../../src/types/env";
 import { error, getAuthUser, json } from "../../lib/helpers";
+import { withErrorHandling } from "../../lib/errors";
 import {
   isOwnedKey,
   isSafeKeyFormat,
@@ -13,7 +14,7 @@ import {
  * Issues a 15-minute presigned GET URL. Ownership (and folder scope) is
  * enforced server-side: foreign keys return 404, never 403 (SECURITY.md §2).
  */
-export const onRequestGet: PagesFunction<Env> = async (context) => {
+export const onRequestGet: PagesFunction<Env> = withErrorHandling(async (context) => {
   const injected = typeof context.data.userId === "string" ? context.data.userId : "";
   const userId = injected || (await getAuthUser(context.env, context.request))?.id;
   if (!userId) return error("Unauthorized", 401);
@@ -33,4 +34,4 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     console.error("Failed to issue download URL:", err);
     return error("Unable to prepare download. Please try again.", 500);
   }
-};
+});

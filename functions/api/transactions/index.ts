@@ -2,14 +2,16 @@ import { eq, and, like, desc } from "drizzle-orm";
 import { transactions, categories } from "../../../src/db/schema";
 import { createDb, getAuthUser, json, error } from "../../lib/helpers";
 import { validateTransactionRow } from "../../lib/validation";
+import { withErrorHandling } from "../../lib/errors";
 
 interface Env {
   DB: D1Database;
   STORAGE: R2Bucket;
   AI: Ai;
+  ENVIRONMENT?: string;
 }
 
-export const onRequestGet: PagesFunction<Env> = async (context) => {
+export const onRequestGet: PagesFunction<Env> = withErrorHandling(async (context) => {
   const user = await getAuthUser(context.env, context.request);
   if (!user) return error("Unauthorized", 401);
 
@@ -43,9 +45,9 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     .orderBy(desc(transactions.date));
 
   return json(rows);
-};
+});
 
-export const onRequestPost: PagesFunction<Env> = async (context) => {
+export const onRequestPost: PagesFunction<Env> = withErrorHandling(async (context) => {
   const user = await getAuthUser(context.env, context.request);
   if (!user) return error("Unauthorized", 401);
 
@@ -81,4 +83,4 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
     .returning();
 
   return json(result[0], 201);
-};
+});

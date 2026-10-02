@@ -1,5 +1,6 @@
 import type { Env } from "../../../src/types/env";
 import { error, getAuthUser, json } from "../../lib/helpers";
+import { withErrorHandling } from "../../lib/errors";
 import {
   isOwnedKey,
   isSafeKeyFormat,
@@ -13,7 +14,7 @@ import {
  * is always addressed through the same S3 endpoint used for uploads and
  * downloads (consistent between `wrangler pages dev` and production).
  */
-export const onRequestDelete: PagesFunction<Env> = async (context) => {
+export const onRequestDelete: PagesFunction<Env> = withErrorHandling(async (context) => {
   const injected = typeof context.data.userId === "string" ? context.data.userId : "";
   const userId = injected || (await getAuthUser(context.env, context.request))?.id;
   if (!userId) return error("Unauthorized", 401);
@@ -39,4 +40,4 @@ export const onRequestDelete: PagesFunction<Env> = async (context) => {
     console.error("Failed to delete object:", err);
     return error("Unable to delete the file. Please try again.", 500);
   }
-};
+});

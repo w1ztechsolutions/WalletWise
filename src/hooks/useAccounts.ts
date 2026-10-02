@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, useRetry } from "@/lib/api";
 import type { Account } from "@/types";
 
 export const accountKeys = {
@@ -12,6 +12,7 @@ export function useAccounts() {
   return useQuery({
     queryKey: accountKeys.lists(),
     queryFn: () => apiFetch<Account[]>("/accounts"),
+    retry: useRetry,
   });
 }
 

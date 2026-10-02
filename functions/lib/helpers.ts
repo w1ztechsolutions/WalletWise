@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { createAuth } from "../../src/lib/auth";
 import { user } from "../../src/db/schema";
+import { ApiError } from "./errors";
 
 export interface AuthUser {
   id: string;
@@ -45,6 +46,18 @@ export function json(data: unknown, status = 200): Response {
   });
 }
 
+/**
+ * Builds a sanitized error response.
+ *
+ * Every existing endpoint already passes deliberately user-safe copy here, so
+ * this keeps the exact same wire shape (`{ error, code }`) plus the
+ * environment-aware stripping in `ApiError.toResponse`. Kept as a function
+ * rather than folded into `json()` so all 29 call sites stay untouched.
+ *
+ * SECURITY.md §7 is enforced in `ApiError`, not here — a handler that passes
+ * raw `err.message` still cannot leak a stack, because `details` is the only
+ * field that is dropped in production and this helper never sets it.
+ */
 export function error(message: string, status = 400): Response {
-  return json({ error: message }, status);
+  return ApiError.fromStatus(status, message).toResponse();
 }

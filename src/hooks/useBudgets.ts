@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, useRetry } from "@/lib/api";
 import { analyticsKeys } from "@/hooks/useAnalytics";
 import type { Budget } from "@/types";
 
@@ -17,6 +17,7 @@ export function useBudgets(month?: string) {
       apiFetch<Budget[]>("/budgets", {
         params: month ? { month } : undefined,
       }),
+    retry: useRetry,
   });
 }
 
