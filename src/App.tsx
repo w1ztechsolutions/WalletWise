@@ -1,122 +1,105 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import React, { useState, useEffect } from 'react'
+import { FinanceProvider } from '@/context/FinanceContext'
+import { Navbar } from '@/components/layout/Navbar'
+import { Sidebar, type NavTab } from '@/components/layout/Sidebar'
+import { BottomNav } from '@/components/layout/BottomNav'
+import { ToastContainer } from '@/components/ui/Toast'
+import { DashboardView } from '@/components/dashboard/DashboardView'
+import { TransactionsView } from '@/components/transactions/TransactionsView'
+import { AccountsView } from '@/components/accounts/AccountsView'
+import { BudgetsView } from '@/components/budgets/BudgetsView'
+import { AnalyticsView } from '@/components/analytics/AnalyticsView'
+import { SettingsView } from '@/components/settings/SettingsView'
 
-function App() {
-  const [count, setCount] = useState(0)
+function AppContent() {
+  // Sync tab with URL hash if present
+  const [activeTab, setActiveTab] = useState<NavTab>(() => {
+    const hash = window.location.hash.replace('#', '') as NavTab
+    const validTabs: NavTab[] = ['dashboard', 'transactions', 'accounts', 'budgets', 'analytics', 'settings']
+    return validTabs.includes(hash) ? hash : 'dashboard'
+  })
+
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [isAddTxModalOpen, setIsAddTxModalOpen] = useState(false)
+
+  const handleSelectTab = (tab: NavTab) => {
+    setActiveTab(tab)
+    window.location.hash = tab
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace('#', '') as NavTab
+      const validTabs: NavTab[] = ['dashboard', 'transactions', 'accounts', 'budgets', 'analytics', 'settings']
+      if (validTabs.includes(hash)) {
+        setActiveTab(hash)
+      }
+    }
+    window.addEventListener('hashchange', handleHashChange)
+    return () => window.removeEventListener('hashchange', handleHashChange)
+  }, [])
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200">
+      {/* Toast notifications */}
+      <ToastContainer />
 
-      <div className="ticks"></div>
+      {/* Top Navbar */}
+      <Navbar
+        onOpenSidebar={() => setIsSidebarOpen(true)}
+        activeTab={activeTab}
+        onOpenAddModal={() => {
+          if (activeTab === 'transactions') {
+            setIsAddTxModalOpen(true)
+          } else {
+            handleSelectTab('transactions')
+            setIsAddTxModalOpen(true)
+          }
+        }}
+      />
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+      {/* Slide-in Sidebar with dark backdrop */}
+      <Sidebar
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+        activeTab={activeTab}
+        onSelectTab={handleSelectTab}
+      />
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+      {/* Main Content Area */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+        {activeTab === 'dashboard' && (
+          <DashboardView
+            onNavigateTab={handleSelectTab}
+            onOpenAddTransaction={() => {
+              handleSelectTab('transactions')
+              setIsAddTxModalOpen(true)
+            }}
+          />
+        )}
+        {activeTab === 'transactions' && (
+          <TransactionsView
+            isAddModalOpen={isAddTxModalOpen}
+            setIsAddModalOpen={setIsAddTxModalOpen}
+          />
+        )}
+        {activeTab === 'accounts' && <AccountsView />}
+        {activeTab === 'budgets' && <BudgetsView />}
+        {activeTab === 'analytics' && <AnalyticsView />}
+        {activeTab === 'settings' && <SettingsView />}
+      </main>
+
+      {/* Fixed Bottom Navigation Bar for Mobile */}
+      <BottomNav activeTab={activeTab} onSelectTab={handleSelectTab} />
+    </div>
   )
 }
 
-export default App
+export default function App() {
+  return (
+    <FinanceProvider>
+      <AppContent />
+    </FinanceProvider>
+  )
+}

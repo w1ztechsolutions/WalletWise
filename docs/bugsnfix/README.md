@@ -10,14 +10,28 @@ This directory tracks all encountered issues, build/runtime bugs, edge cases, ro
 - **Symptoms / Error Message:**
   ```text
   fatal: detected dubious ownership in repository at 'C:/Users/WIZTECH SOLUTIONS/Desktop/Projects/WalletWise'
-  'C:/Users/WIZTECH SOLUTIONS/Desktop/Projects/WalletWise' is owned by:
-    CHINKO/wisdo (S-1-5-21-4258414097-639853180-76571453-1001)
-  but the current user is:
-    CHINKO/WIZTECH SOLUTIONS (S-1-5-21-4258414097-639853180-76571453-1007)
   ```
 - **Root Cause:**
-  Git security protections (introduced in CVE-2022-24765) prevent Git commands in directories where the folder owner SID does not match the active shell execution user SID.
+  Git security protections (CVE-2022-24765) prevent Git operations across different Windows user SID directory owners.
 - **Fix Implemented:**
   Executed `git config --global --add safe.directory "C:/Users/WIZTECH SOLUTIONS/Desktop/Projects/WalletWise"`.
 - **Verification:**
-  `git status` and `git commit` succeeded immediately with clean root-commit creation.
+  `git status` and `git commit` succeeded immediately.
+
+---
+
+### [BUG-002] TypeScript 6 build errors with deprecated baseUrl and extension imports
+- **Date:** 2026-10-02
+- **Severity:** Medium
+- **Symptoms / Error Message:**
+  ```text
+  error TS5101: Option 'baseUrl' is deprecated and will stop functioning in TypeScript 7.0.
+  error TS5097: An import path can only end with a '.tsx' extension when 'allowImportingTsExtensions' is enabled.
+  ```
+- **Root Cause:**
+  TypeScript 6.0 deprecates `baseUrl` when standard path mappings are used, and Vite template default `main.tsx` included an explicit `.tsx` file extension in the import statement.
+- **Fix Implemented:**
+  1. Removed `baseUrl` from `tsconfig.app.json` while retaining `"@/*": ["./src/*"]`.
+  2. Changed `import App from './App.tsx'` to `import App from './App'` in `src/main.tsx`.
+- **Verification:**
+  `npm run build` passes with zero errors.
