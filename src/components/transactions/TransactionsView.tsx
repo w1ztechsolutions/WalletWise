@@ -156,23 +156,23 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
     <div className="space-y-6 pb-20 md:pb-6">
       {/* Top Action & Summary Bar */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-        <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200/80 dark:border-slate-800 shadow-sm">
-          <span className="text-xs text-slate-500 font-medium">Filtered Income</span>
-          <p className="text-lg sm:text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">
+        <div className="bg-surface rounded-2xl p-4 border border-hairline shadow-card">
+          <span className="text-xs text-muted font-medium">Filtered Income</span>
+          <p className="text-lg sm:text-xl font-bold text-success mt-1">
             +{formatCurrency(summary.income)}
           </p>
         </div>
-        <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200/80 dark:border-slate-800 shadow-sm">
-          <span className="text-xs text-slate-500 font-medium">Filtered Expense</span>
-          <p className="text-lg sm:text-xl font-bold text-rose-600 dark:text-rose-400 mt-1">
+        <div className="bg-surface rounded-2xl p-4 border border-hairline shadow-card">
+          <span className="text-xs text-muted font-medium">Filtered Expense</span>
+          <p className="text-lg sm:text-xl font-bold text-danger mt-1">
             -{formatCurrency(summary.expense)}
           </p>
         </div>
-        <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200/80 dark:border-slate-800 shadow-sm">
-          <span className="text-xs text-slate-500 font-medium">Net Difference</span>
+        <div className="bg-surface rounded-2xl p-4 border border-hairline shadow-card">
+          <span className="text-xs text-muted font-medium">Net Difference</span>
           <p
             className={`text-lg sm:text-xl font-bold mt-1 ${
-              summary.net >= 0 ? 'text-slate-900 dark:text-slate-100' : 'text-rose-600 dark:text-rose-400'
+              summary.net >= 0 ? 'text-success' : 'text-danger'
             }`}
           >
             {formatCurrency(summary.net)}
@@ -181,17 +181,17 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
       </div>
 
       {/* Filter Controls */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-3">
+      <div className="bg-surface rounded-2xl p-4 border border-hairline shadow-card space-y-3">
         <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
           {/* Search Box */}
           <div className="relative flex-1">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-muted absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               placeholder="Search description, category, notes..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 text-sm rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full pl-9 pr-4 py-2 text-sm rounded-xl bg-surface-3 border border-hairline text-platinum placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-indigo"
             />
           </div>
 
@@ -201,7 +201,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
               resetForm()
               setIsAddModalOpen(true)
             }}
-            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold shadow-sm transition-all"
+            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-gold hover:bg-gold-hover text-ink shadow-gold text-sm font-semibold transition-all"
           >
             <Plus className="w-4 h-4" />
             <span>New Transaction</span>
@@ -209,12 +209,12 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
         </div>
 
         {/* Dropdown Filters */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1 border-t border-slate-100 dark:border-slate-800">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1 border-t border-hairline">
           <div>
             <select
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value as any)}
-              className="w-full px-3 py-1.5 text-xs rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="w-full px-3 py-1.5 text-xs rounded-xl bg-surface-3 border border-hairline text-muted text-platinum focus:outline-none focus:ring-1 focus:ring-indigo"
             >
               <option value="all">All Types</option>
               <option value="income">Income Only</option>
@@ -226,7 +226,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="w-full px-3 py-1.5 text-xs rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="w-full px-3 py-1.5 text-xs rounded-xl bg-surface-3 border border-hairline text-muted text-platinum focus:outline-none focus:ring-1 focus:ring-indigo"
             >
               <option value="all">All Categories</option>
               {categories.map((c) => (
@@ -242,7 +242,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
               type="month"
               value={monthFilter}
               onChange={(e) => setMonthFilter(e.target.value)}
-              className="w-full px-3 py-1.5 text-xs rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="w-full px-3 py-1.5 text-xs rounded-xl bg-surface-3 border border-hairline text-muted text-platinum focus:outline-none focus:ring-1 focus:ring-indigo"
             />
           </div>
         </div>
@@ -250,14 +250,14 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
 
       {/* Transactions Grouped By Date */}
       {Object.keys(groupedByDate).length === 0 ? (
-        <div className="bg-white dark:bg-slate-900 rounded-2xl p-12 border border-slate-200/80 dark:border-slate-800 text-center">
-          <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 mx-auto mb-3">
+        <div className="bg-surface rounded-2xl p-12 border border-hairline text-center">
+          <div className="w-12 h-12 rounded-full bg-surface-3 flex items-center justify-center text-muted mx-auto mb-3">
             <FileText className="w-6 h-6" />
           </div>
-          <h3 className="text-base font-semibold text-slate-800 dark:text-slate-200">
+          <h3 className="text-base font-semibold text-platinum">
             No transactions found
           </h3>
-          <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+          <p className="text-xs text-muted mt-1 max-w-sm mx-auto">
             Try adjusting your search query, clearing filters, or record a new transaction.
           </p>
           <button
@@ -265,7 +265,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
               resetForm()
               setIsAddModalOpen(true)
             }}
-            className="mt-4 px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 transition-colors"
+            className="mt-4 px-4 py-2 rounded-xl bg-gold text-ink text-xs font-semibold hover:bg-gold-hover shadow-gold transition-colors"
           >
             + Add Transaction
           </button>
@@ -275,29 +275,29 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
           {Object.entries(groupedByDate).map(([date, items]) => (
             <div
               key={date}
-              className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden"
+              className="bg-surface rounded-2xl border border-hairline shadow-card overflow-hidden"
             >
               {/* Date Header */}
-              <div className="bg-slate-50/80 dark:bg-slate-800/40 px-4 py-2 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+              <div className="bg-surface-2 px-4 py-2 border-b border-hairline flex items-center justify-between">
+                <span className="text-xs font-semibold text-muted">
                   {formatDate(date)}
                 </span>
-                <span className="text-[11px] text-slate-400">{items.length} records</span>
+                <span className="text-[11px] text-muted">{items.length} records</span>
               </div>
 
               {/* Transactions in this date */}
-              <div className="divide-y divide-slate-100 dark:divide-slate-800">
+              <div className="divide-y divide-hairline">
                 {items.map((tx) => (
                   <div
                     key={tx.id}
-                    className="p-4 flex items-center justify-between hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors group"
+                    className="p-4 flex items-center justify-between hover:bg-surface-3 transition-colors group"
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <div
                         className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
                           tx.type === 'income'
-                            ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400'
-                            : 'bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400'
+                            ? 'bg-success/10 text-success'
+                            : 'bg-danger/10 text-danger'
                         }`}
                       >
                         {tx.type === 'income' ? (
@@ -309,22 +309,22 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
 
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">
+                          <p className="text-sm font-semibold text-platinum truncate">
                             {tx.description || tx.category_name}
                           </p>
                           {tx.is_recurring && (
-                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400 text-[10px] font-medium shrink-0">
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-indigo/15 border border-indigo/40 text-platinum text-[10px] font-medium shrink-0">
                               <Repeat className="w-2.5 h-2.5" />
                               <span>Recurring</span>
                             </span>
                           )}
                         </div>
                         <div className="flex items-center gap-2 mt-1">
-                          <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                          <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-surface-3 text-muted">
                             {tx.category_name}
                           </span>
                           {tx.notes && (
-                            <span className="text-xs text-slate-400 truncate max-w-xs hidden sm:inline">
+                            <span className="text-xs text-muted truncate max-w-xs hidden sm:inline">
                               "{tx.notes}"
                             </span>
                           )}
@@ -336,8 +336,8 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
                       <span
                         className={`text-sm sm:text-base font-bold ${
                           tx.type === 'income'
-                            ? 'text-emerald-600 dark:text-emerald-400'
-                            : 'text-slate-900 dark:text-slate-100'
+                            ? 'text-success'
+                            : 'text-platinum'
                         }`}
                       >
                         {tx.type === 'income' ? '+' : '-'}
@@ -348,14 +348,14 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={() => openEdit(tx)}
-                          className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                          className="p-1.5 text-muted hover:text-indigo hover:bg-surface-3 rounded-lg transition-colors"
                           title="Edit transaction"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => setDeletingId(tx.id)}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-lg transition-colors"
+                          className="p-1.5 text-muted hover:text-danger hover:bg-danger/10 rounded-lg transition-colors"
                           title="Delete transaction"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -372,10 +372,10 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
 
       {/* Add / Edit Dialog Modal */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
-              <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/80 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-surface rounded-2xl max-w-md w-full p-6 shadow-2xl border border-hairline">
+            <div className="flex items-center justify-between pb-4 border-b border-hairline">
+              <h3 className="text-base font-bold text-platinum">
                 {editingTransaction ? 'Edit Transaction' : 'Record Transaction'}
               </h3>
               <button
@@ -383,7 +383,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
                   setIsAddModalOpen(false)
                   resetForm()
                 }}
-                className="text-slate-400 hover:text-slate-600 p-1"
+                className="text-muted hover:text-platinum p-1"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -391,7 +391,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
 
             <form onSubmit={handleSave} className="space-y-4 mt-4">
               {/* Type Switcher */}
-              <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
+              <div className="grid grid-cols-2 gap-2 p-1 bg-surface-3 rounded-xl">
                 <button
                   type="button"
                   onClick={() => {
@@ -403,8 +403,8 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
                   }}
                   className={`py-2 text-xs font-semibold rounded-lg transition-all ${
                     formData.type === 'expense'
-                      ? 'bg-white dark:bg-slate-900 text-rose-600 shadow-sm'
-                      : 'text-slate-500 hover:text-slate-900'
+                      ? 'bg-surface text-danger shadow-card'
+                      : 'text-muted hover:text-platinum'
                   }`}
                 >
                   Expense
@@ -420,8 +420,8 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
                   }}
                   className={`py-2 text-xs font-semibold rounded-lg transition-all ${
                     formData.type === 'income'
-                      ? 'bg-white dark:bg-slate-900 text-emerald-600 shadow-sm'
-                      : 'text-slate-500 hover:text-slate-900'
+                      ? 'bg-surface text-success shadow-card'
+                      : 'text-muted hover:text-platinum'
                   }`}
                 >
                   Income
@@ -431,7 +431,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
               {/* Amount & Date */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-medium text-muted mb-1">
                     Amount *
                   </label>
                   <input
@@ -442,11 +442,11 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
                     placeholder="0.00"
                     value={formData.amount}
                     onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                    className="w-full px-3 py-2 text-sm rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-3 py-2 text-sm rounded-xl bg-surface-3 border border-hairline text-platinum focus:outline-none focus:ring-2 focus:ring-indigo"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-medium text-muted mb-1">
                     Date *
                   </label>
                   <input
@@ -454,21 +454,21 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
                     required
                     value={formData.date}
                     onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                    className="w-full px-3 py-2 text-sm rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-3 py-2 text-sm rounded-xl bg-surface-3 border border-hairline text-platinum focus:outline-none focus:ring-2 focus:ring-indigo"
                   />
                 </div>
               </div>
 
               {/* Category */}
               <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                <label className="block text-xs font-medium text-muted mb-1">
                   Category *
                 </label>
                 <select
                   required
                   value={formData.category_id}
                   onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
-                  className="w-full px-3 py-2 text-sm rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-3 py-2 text-sm rounded-xl bg-surface-3 border border-hairline text-platinum focus:outline-none focus:ring-2 focus:ring-indigo"
                 >
                   {categories
                     .filter((c) => c.type === formData.type)
@@ -482,7 +482,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
 
               {/* Description */}
               <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                <label className="block text-xs font-medium text-muted mb-1">
                   Description / Payee
                 </label>
                 <input
@@ -490,7 +490,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
                   placeholder="e.g. Grocery store, Client invoice"
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full px-3 py-2 text-sm rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-3 py-2 text-sm rounded-xl bg-surface-3 border border-hairline text-platinum focus:outline-none focus:ring-2 focus:ring-indigo"
                 />
               </div>
 
@@ -501,16 +501,16 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
                   id="recurring"
                   checked={formData.is_recurring}
                   onChange={(e) => setFormData({ ...formData, is_recurring: e.target.checked })}
-                  className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 dark:border-slate-700"
+                  className="w-4 h-4 rounded text-indigo focus:ring-indigo border-hairline"
                 />
-                <label htmlFor="recurring" className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                <label htmlFor="recurring" className="text-xs font-medium text-muted">
                   Mark as recurring monthly transaction
                 </label>
               </div>
 
               {/* Notes */}
               <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                <label className="block text-xs font-medium text-muted mb-1">
                   Notes (optional)
                 </label>
                 <textarea
@@ -518,25 +518,25 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
                   placeholder="Additional context or receipt details..."
                   value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  className="w-full px-3 py-2 text-sm rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-3 py-2 text-sm rounded-xl bg-surface-3 border border-hairline text-platinum focus:outline-none focus:ring-2 focus:ring-indigo"
                 />
               </div>
 
               {/* Form Buttons */}
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-hairline">
                 <button
                   type="button"
                   onClick={() => {
                     setIsAddModalOpen(false)
                     resetForm()
                   }}
-                  className="px-4 py-2 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
+                  className="px-4 py-2 text-xs font-medium text-muted hover:bg-surface-3 rounded-xl transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-sm transition-all"
+                  className="px-5 py-2 text-xs font-semibold bg-gold hover:bg-gold-hover text-ink shadow-gold rounded-xl transition-all"
                 >
                   {editingTransaction ? 'Save Changes' : 'Record Transaction'}
                 </button>
@@ -548,18 +548,18 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
 
       {/* Delete Confirmation Modal */}
       {deletingId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-sm w-full p-5 shadow-2xl border border-slate-200 dark:border-slate-800 text-center">
-            <h4 className="text-base font-bold text-slate-900 dark:text-slate-100">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/80 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-surface rounded-2xl max-w-sm w-full p-5 shadow-2xl border border-hairline text-center">
+            <h4 className="text-base font-bold text-platinum">
               Delete Transaction?
             </h4>
-            <p className="text-xs text-slate-500 mt-2">
+            <p className="text-xs text-muted mt-2">
               This action cannot be undone and will update your dashboard calculations.
             </p>
             <div className="flex items-center justify-center gap-3 mt-5">
               <button
                 onClick={() => setDeletingId(null)}
-                className="px-4 py-2 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl"
+                className="px-4 py-2 text-xs font-medium text-muted hover:bg-surface-3 rounded-xl"
               >
                 Cancel
               </button>
@@ -568,7 +568,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
                   deleteTransaction(deletingId)
                   setDeletingId(null)
                 }}
-                className="px-4 py-2 text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white rounded-xl"
+                className="px-4 py-2 text-xs font-semibold bg-danger hover:bg-danger/90 text-ink rounded-xl"
               >
                 Confirm Delete
               </button>

@@ -8,7 +8,6 @@ import {
   ArrowDownLeft,
   AlertTriangle,
   ChevronRight,
-  PlusCircle,
 } from 'lucide-react'
 import {
   PieChart,
@@ -30,16 +29,29 @@ interface DashboardViewProps {
   onOpenAddTransaction: () => void
 }
 
+const TOOLTIP_STYLE = {
+  backgroundColor: '#1A1A24',
+  border: '1px solid #2D2D3A',
+  borderRadius: '0.75rem',
+  fontSize: '12px',
+  color: '#E2E8F0',
+}
+
+const CARD_STYLE: React.CSSProperties = {
+  backgroundColor: 'var(--bg-surface)',
+  border: '1px solid var(--border)',
+  borderRadius: '1rem',
+  boxShadow: 'var(--shadow-card)',
+}
+
 export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab, onOpenAddTransaction }) => {
   const { transactions, budgets, categories } = useFinance()
   const currentMonth = getCurrentMonth()
 
-  // 1. Current month filtered transactions
   const monthTransactions = useMemo(() => {
     return transactions.filter((t) => t.date.startsWith(currentMonth))
   }, [transactions, currentMonth])
 
-  // 2. Stat calculations
   const stats = useMemo(() => {
     let income = 0
     let expenses = 0
@@ -52,7 +64,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab, onO
     const netBalance = income - expenses
     const savingsRate = income > 0 ? Math.max(0, Math.round(((income - expenses) / income) * 100)) : 0
 
-    // Top category spending
     const expenseByCat: Record<string, number> = {}
     monthTransactions
       .filter((t) => t.type === 'expense')
@@ -62,12 +73,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab, onO
 
     let topCategory = { name: 'None', amount: 0 }
     Object.entries(expenseByCat).forEach(([name, amt]) => {
-      if (amt > topCategory.amount) {
-        topCategory = { name, amount: amt }
-      }
+      if (amt > topCategory.amount) topCategory = { name, amount: amt }
     })
 
-    // Budget Score (0-100): baseline 100, penalized if expenses exceed planned budgets or income
     let totalPlanned = 0
     const currentMonthBudgets = budgets.filter((b) => b.month === currentMonth)
     currentMonthBudgets.forEach((b) => (totalPlanned += b.planned_amount))
@@ -85,73 +93,50 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab, onO
     return { income, expenses, netBalance, savingsRate, budgetScore, topCategory }
   }, [monthTransactions, budgets, currentMonth])
 
-  // 3. Category Donut Data
   const categoryData = useMemo(() => {
     const map = new Map<string, { name: string; value: number; color: string }>()
     monthTransactions
       .filter((t) => t.type === 'expense')
       .forEach((t) => {
         const cat = categories.find((c) => c.id === t.category_id)
-        const color = cat?.color || '#6366f1'
+        const color = cat?.color || '#4F46E5'
         const existing = map.get(t.category_name)
-        if (existing) {
-          existing.value += t.amount
-        } else {
-          map.set(t.category_name, { name: t.category_name, value: t.amount, color })
-        }
+        if (existing) existing.value += t.amount
+        else map.set(t.category_name, { name: t.category_name, value: t.amount, color })
       })
     return Array.from(map.values())
   }, [monthTransactions, categories])
 
-  // 4. 6-Month Income vs Expenses Bar Chart Data
   const monthlyTrendData = useMemo(() => {
     const result: { month: string; Income: number; Expenses: number }[] = []
     const now = new Date()
-
     for (let i = 5; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
       const monthStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
       const label = d.toLocaleString('en-US', { month: 'short' })
-
-      let mIncome = 0
-      let mExpense = 0
-
+      let mIncome = 0, mExpense = 0
       transactions.forEach((t) => {
         if (t.date.startsWith(monthStr)) {
           if (t.type === 'income') mIncome += t.amount
           else mExpense += t.amount
         }
       })
-
-      result.push({
-        month: label,
-        Income: mIncome,
-        Expenses: mExpense,
-      })
+      result.push({ month: label, Income: mIncome, Expenses: mExpense })
     }
     return result
   }, [transactions])
 
-  // 5. Budget vs Actual Progress
   const budgetProgress = useMemo(() => {
-    const currentMonthBudgets = budgets.filter((b) => b.month === currentMonth)
-    return currentMonthBudgets.map((b) => {
+    return budgets.filter((b) => b.month === currentMonth).map((b) => {
       const actual = monthTransactions
         .filter((t) => t.type === 'expense' && t.category_id === b.category_id)
         .reduce((sum, t) => sum + t.amount, 0)
       const cat = categories.find((c) => c.id === b.category_id)
       const percentage = b.planned_amount > 0 ? Math.round((actual / b.planned_amount) * 100) : 0
-      return {
-        ...b,
-        actual,
-        percentage,
-        color: cat?.color || '#6366f1',
-        isOverBudget: actual > b.planned_amount,
-      }
+      return { ...b, actual, percentage, color: cat?.color || '#4F46E5', isOverBudget: actual > b.planned_amount }
     })
   }, [budgets, monthTransactions, categories, currentMonth])
 
-  // 6. Recent 5 Transactions
   const recentTransactions = useMemo(() => {
     return [...transactions]
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
@@ -159,105 +144,136 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab, onO
   }, [transactions])
 
   return (
-    <div className="space-y-6 pb-20 md:pb-6">
-      {/* 4 Stat Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-        {/* Net Balance */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <span className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400">
-              Net Balance
-            </span>
-            <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
-              <Wallet className="w-4 h-4" />
-            </div>
-          </div>
-          <p className={`text-xl sm:text-2xl font-bold mt-2 tracking-tight ${stats.netBalance >= 0 ? 'text-slate-900 dark:text-slate-50' : 'text-red-600 dark:text-red-400'}`}>
+    <div className="space-y-5 pb-20 md:pb-8">
+
+      {/* ── Hero Banner */}
+      <div
+        className="rounded-2xl p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
+        style={{
+          background: 'linear-gradient(135deg, #1A1A24 0%, #222232 50%, #1A1A24 100%)',
+          border: '1px solid var(--border)',
+          boxShadow: '0 0 60px rgba(217,119,6,0.06), 0 4px 20px rgba(0,0,0,0.5)',
+        }}
+      >
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: 'var(--accent-gold)' }}>
+            Monthly Overview
+          </p>
+          <p className="text-3xl sm:text-4xl font-black tracking-tight" style={{ color: 'var(--text-primary)' }}>
             {formatCurrency(stats.netBalance)}
           </p>
-          <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium mt-1 flex items-center gap-1">
+          <p className="text-sm mt-1 flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
+            {stats.netBalance >= 0 ? (
+              <TrendingUp className="w-4 h-4" style={{ color: 'var(--success)' }} />
+            ) : (
+              <TrendingDown className="w-4 h-4" style={{ color: 'var(--danger)' }} />
+            )}
+            Net balance · {stats.savingsRate}% savings rate this month
+          </p>
+        </div>
+        <div
+          className="flex items-center gap-4 shrink-0"
+        >
+          <div className="text-center">
+            <p className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Income</p>
+            <p className="text-lg font-bold" style={{ color: 'var(--success)' }}>+{formatCurrency(stats.income)}</p>
+          </div>
+          <div className="w-px h-10" style={{ backgroundColor: 'var(--border)' }} />
+          <div className="text-center">
+            <p className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Expenses</p>
+            <p className="text-lg font-bold" style={{ color: 'var(--danger)' }}>-{formatCurrency(stats.expenses)}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── 4 Stat Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {/* Net Balance */}
+        <div className="p-4 sm:p-5 rounded-2xl relative overflow-hidden" style={CARD_STYLE}>
+          <div className="flex items-center justify-between">
+            <span className="text-xs sm:text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Net Balance</span>
+            <div className="p-2 rounded-xl" style={{ backgroundColor: 'var(--accent-indigo-subtle)' }}>
+              <Wallet className="w-4 h-4" style={{ color: 'var(--accent-indigo)' }} />
+            </div>
+          </div>
+          <p className="text-xl sm:text-2xl font-bold mt-2 tracking-tight"
+            style={{ color: stats.netBalance >= 0 ? 'var(--text-primary)' : 'var(--danger)' }}>
+            {formatCurrency(stats.netBalance)}
+          </p>
+          <p className="text-xs font-medium mt-1 flex items-center gap-1"
+            style={{ color: stats.netBalance >= 0 ? 'var(--success)' : 'var(--danger)' }}>
             <TrendingUp className="w-3 h-3" />
-            <span>{stats.savingsRate}% savings rate</span>
+            <span>{stats.savingsRate}% savings</span>
           </p>
         </div>
 
         {/* Income */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm">
+        <div className="p-4 sm:p-5 rounded-2xl" style={CARD_STYLE}>
           <div className="flex items-center justify-between">
-            <span className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400">
-              Income
-            </span>
-            <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
-              <ArrowDownLeft className="w-4 h-4" />
+            <span className="text-xs sm:text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Income</span>
+            <div className="p-2 rounded-xl" style={{ backgroundColor: 'var(--success-subtle)' }}>
+              <ArrowDownLeft className="w-4 h-4" style={{ color: 'var(--success)' }} />
             </div>
           </div>
-          <p className="text-xl sm:text-2xl font-bold mt-2 tracking-tight text-emerald-600 dark:text-emerald-400">
+          <p className="text-xl sm:text-2xl font-bold mt-2 tracking-tight" style={{ color: 'var(--success)' }}>
             +{formatCurrency(stats.income)}
           </p>
-          <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">This month</p>
+          <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>This month</p>
         </div>
 
         {/* Expenses */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm">
+        <div className="p-4 sm:p-5 rounded-2xl" style={CARD_STYLE}>
           <div className="flex items-center justify-between">
-            <span className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400">
-              Expenses
-            </span>
-            <div className="p-2 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400">
-              <ArrowUpRight className="w-4 h-4" />
+            <span className="text-xs sm:text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Expenses</span>
+            <div className="p-2 rounded-xl" style={{ backgroundColor: 'var(--danger-subtle)' }}>
+              <ArrowUpRight className="w-4 h-4" style={{ color: 'var(--danger)' }} />
             </div>
           </div>
-          <p className="text-xl sm:text-2xl font-bold mt-2 tracking-tight text-rose-600 dark:text-rose-400">
+          <p className="text-xl sm:text-2xl font-bold mt-2 tracking-tight" style={{ color: 'var(--danger)' }}>
             -{formatCurrency(stats.expenses)}
           </p>
-          <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">This month</p>
+          <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>This month</p>
         </div>
 
         {/* Budget Score */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm">
+        <div className="p-4 sm:p-5 rounded-2xl" style={CARD_STYLE}>
           <div className="flex items-center justify-between">
-            <span className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400">
-              Budget Score
-            </span>
-            <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400">
-              <Target className="w-4 h-4" />
+            <span className="text-xs sm:text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Budget Score</span>
+            <div className="p-2 rounded-xl" style={{ backgroundColor: 'var(--accent-gold-subtle)' }}>
+              <Target className="w-4 h-4" style={{ color: 'var(--accent-gold)' }} />
             </div>
           </div>
           <div className="flex items-baseline gap-1 mt-2">
-            <p className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-50">
+            <p className="text-xl sm:text-2xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
               {stats.budgetScore}
             </p>
-            <span className="text-xs text-slate-400">/ 100</span>
+            <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>/ 100</span>
           </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-1">
+          <p className="text-xs truncate mt-1" style={{ color: 'var(--text-secondary)' }}>
             Top: {stats.topCategory.name}
           </p>
         </div>
       </div>
 
-      {/* Main Charts Grid (1 col mobile, 2 col desktop) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Spending by Category Donut */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col">
+      {/* ── Charts Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+        {/* Donut: Spending by Category */}
+        <div className="p-5 rounded-2xl flex flex-col" style={CARD_STYLE}>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-              Spending by Category
-            </h2>
-            <span className="text-xs text-slate-500">Current Month</span>
+            <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Spending by Category</h2>
+            <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Current Month</span>
           </div>
 
           {categoryData.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center py-12 text-center">
-              <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 mb-2">
-                <Wallet className="w-6 h-6" />
+              <div className="w-12 h-12 rounded-full flex items-center justify-center mb-2"
+                style={{ backgroundColor: 'var(--bg-surface-2)' }}>
+                <Wallet className="w-6 h-6" style={{ color: 'var(--text-secondary)' }} />
               </div>
-              <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
-                No expenses logged this month
-              </p>
-              <button
-                onClick={onOpenAddTransaction}
-                className="mt-3 text-xs text-indigo-600 font-semibold hover:underline"
-              >
+              <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>No expenses this month</p>
+              <button onClick={onOpenAddTransaction} className="mt-3 text-xs font-semibold hover:underline"
+                style={{ color: 'var(--accent-gold)' }}>
                 + Add your first transaction
               </button>
             </div>
@@ -265,87 +281,55 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab, onO
             <div className="h-64 w-full flex items-center">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie
-                    data={categoryData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={55}
-                    outerRadius={85}
-                    paddingAngle={3}
-                    dataKey="value"
-                  >
+                  <Pie data={categoryData} cx="50%" cy="50%" innerRadius={55} outerRadius={85}
+                    paddingAngle={3} dataKey="value">
                     {categoryData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip
-                    formatter={(value: any) => [formatCurrency(Number(value)), 'Spent']}
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--card))',
-                      borderColor: 'hsl(var(--border))',
-                      borderRadius: '0.75rem',
-                      fontSize: '12px',
-                    }}
-                  />
-                  <Legend
-                    verticalAlign="bottom"
-                    height={36}
-                    formatter={(val) => <span className="text-xs text-slate-600 dark:text-slate-300">{val}</span>}
-                  />
+                  <Tooltip formatter={(value: any) => [formatCurrency(Number(value)), 'Spent']}
+                    contentStyle={TOOLTIP_STYLE} />
+                  <Legend verticalAlign="bottom" height={36}
+                    formatter={(val) => <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{val}</span>} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
           )}
         </div>
 
-        {/* 6-Month Income vs Expenses Bar Chart */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col">
+        {/* Bar: Income vs Expenses (6 months) */}
+        <div className="p-5 rounded-2xl flex flex-col" style={CARD_STYLE}>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-              Income vs Expenses
-            </h2>
-            <span className="text-xs text-slate-500">Last 6 Months</span>
+            <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Income vs Expenses</h2>
+            <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Last 6 Months</span>
           </div>
-
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={monthlyTrendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke="#94a3b8" />
-                <YAxis tick={{ fontSize: 11 }} stroke="#94a3b8" />
-                <Tooltip
-                  formatter={(val: any) => [formatCurrency(Number(val)), '']}
-                  contentStyle={{
-                    backgroundColor: 'hsl(var(--card))',
-                    borderColor: 'hsl(var(--border))',
-                    borderRadius: '0.75rem',
-                    fontSize: '12px',
-                  }}
-                />
-                <Legend
-                  verticalAlign="bottom"
-                  height={36}
-                  formatter={(val) => <span className="text-xs text-slate-600 dark:text-slate-300">{val}</span>}
-                />
-                <Bar dataKey="Income" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={32} />
-                <Bar dataKey="Expenses" fill="#f43f5e" radius={[4, 4, 0, 0]} maxBarSize={32} />
+                <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
+                <Tooltip formatter={(val: any) => [formatCurrency(Number(val)), '']}
+                  contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
+                <Legend verticalAlign="bottom" height={36}
+                  formatter={(val) => <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{val}</span>} />
+                <Bar dataKey="Income" fill="#22C55E" radius={[4, 4, 0, 0]} maxBarSize={32} />
+                <Bar dataKey="Expenses" fill="#EF4444" radius={[4, 4, 0, 0]} maxBarSize={32} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
       </div>
 
-      {/* Bottom Grid: Budget vs Actual & Recent Transactions */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Budget Progress */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm">
+      {/* ── Bottom Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+        {/* Budget vs Actual */}
+        <div className="p-5 rounded-2xl" style={CARD_STYLE}>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-              Budget vs Actual
-            </h2>
-            <button
-              onClick={() => onNavigateTab('budgets')}
-              className="text-xs text-indigo-600 dark:text-indigo-400 font-semibold hover:underline flex items-center gap-0.5"
-            >
+            <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Budget vs Actual</h2>
+            <button onClick={() => onNavigateTab('budgets')}
+              className="text-xs font-semibold flex items-center gap-0.5 hover:underline"
+              style={{ color: 'var(--accent-gold)' }}>
               <span>View All</span>
               <ChevronRight className="w-3.5 h-3.5" />
             </button>
@@ -353,11 +337,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab, onO
 
           {budgetProgress.length === 0 ? (
             <div className="py-8 text-center">
-              <p className="text-sm text-slate-500">No active budgets for this month.</p>
-              <button
-                onClick={() => onNavigateTab('budgets')}
-                className="mt-2 text-xs font-semibold text-indigo-600 hover:underline"
-              >
+              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>No active budgets this month.</p>
+              <button onClick={() => onNavigateTab('budgets')}
+                className="mt-2 text-xs font-semibold hover:underline" style={{ color: 'var(--accent-gold)' }}>
                 + Set monthly budget
               </button>
             </div>
@@ -367,34 +349,34 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab, onO
                 <div key={item.id} className="space-y-1.5">
                   <div className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
-                      <span className="font-medium text-slate-800 dark:text-slate-200">
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                      <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
                         {item.category_name}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-slate-500">
+                      <span style={{ color: 'var(--text-secondary)' }}>
                         {formatCurrency(item.actual)} / {formatCurrency(item.planned_amount)}
                       </span>
                       {item.isOverBudget && (
-                        <span className="flex items-center gap-0.5 text-rose-600 dark:text-rose-400 font-semibold">
+                        <span className="flex items-center gap-0.5 font-semibold" style={{ color: 'var(--danger)' }}>
                           <AlertTriangle className="w-3 h-3" />
                           <span>Over</span>
                         </span>
                       )}
                     </div>
                   </div>
-                  {/* Progress bar */}
-                  <div className="w-full h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                  <div className="w-full h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--bg-surface-3)' }}>
                     <div
-                      className={`h-full rounded-full transition-all duration-500 ${
-                        item.isOverBudget
-                          ? 'bg-rose-500'
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{
+                        width: `${Math.min(100, item.percentage)}%`,
+                        backgroundColor: item.isOverBudget
+                          ? 'var(--danger)'
                           : item.percentage > 85
-                          ? 'bg-amber-500'
-                          : 'bg-indigo-600'
-                      }`}
-                      style={{ width: `${Math.min(100, item.percentage)}%` }}
+                          ? '#F59E0B'
+                          : 'var(--accent-gold)',
+                      }}
                     />
                   </div>
                 </div>
@@ -403,16 +385,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab, onO
           )}
         </div>
 
-        {/* Recent Transactions List (Latest 5) */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm">
+        {/* Recent Transactions */}
+        <div className="p-5 rounded-2xl" style={CARD_STYLE}>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-              Recent Transactions
-            </h2>
-            <button
-              onClick={() => onNavigateTab('transactions')}
-              className="text-xs text-indigo-600 dark:text-indigo-400 font-semibold hover:underline flex items-center gap-0.5"
-            >
+            <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Recent Transactions</h2>
+            <button onClick={() => onNavigateTab('transactions')}
+              className="text-xs font-semibold flex items-center gap-0.5 hover:underline"
+              style={{ color: 'var(--accent-gold)' }}>
               <span>View All</span>
               <ChevronRight className="w-3.5 h-3.5" />
             </button>
@@ -420,52 +399,41 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab, onO
 
           {recentTransactions.length === 0 ? (
             <div className="py-8 text-center">
-              <p className="text-sm text-slate-500">No transactions recorded yet.</p>
-              <button
-                onClick={onOpenAddTransaction}
-                className="mt-2 text-xs font-semibold text-indigo-600 hover:underline"
-              >
+              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>No transactions yet.</p>
+              <button onClick={onOpenAddTransaction} className="mt-2 text-xs font-semibold hover:underline"
+                style={{ color: 'var(--accent-gold)' }}>
                 + Record transaction
               </button>
             </div>
           ) : (
-            <div className="divide-y divide-slate-100 dark:divide-slate-800">
+            <div className="space-y-0" style={{ borderTop: '1px solid var(--border)' }}>
               {recentTransactions.map((tx) => (
-                <div key={tx.id} className="py-3 flex items-center justify-between first:pt-0 last:pb-0">
+                <div key={tx.id} className="py-3 flex items-center justify-between"
+                  style={{ borderBottom: '1px solid var(--border)' }}>
                   <div className="flex items-center gap-3 min-w-0">
                     <div
-                      className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                        tx.type === 'income'
-                          ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400'
-                          : 'bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400'
-                      }`}
+                      className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                      style={{
+                        backgroundColor: tx.type === 'income' ? 'var(--success-subtle)' : 'var(--danger-subtle)',
+                        color: tx.type === 'income' ? 'var(--success)' : 'var(--danger)',
+                      }}
                     >
-                      {tx.type === 'income' ? (
-                        <ArrowDownLeft className="w-4 h-4" />
-                      ) : (
-                        <ArrowUpRight className="w-4 h-4" />
-                      )}
+                      {tx.type === 'income' ? <ArrowDownLeft className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />}
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">
+                      <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
                         {tx.description || tx.category_name}
                       </p>
-                      <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-400">
+                      <div className="flex items-center gap-2 mt-0.5 text-xs" style={{ color: 'var(--text-secondary)' }}>
                         <span>{tx.category_name}</span>
-                        <span>•</span>
+                        <span>·</span>
                         <span>{formatDate(tx.date)}</span>
                       </div>
                     </div>
                   </div>
-                  <span
-                    className={`text-sm font-bold shrink-0 ml-3 ${
-                      tx.type === 'income'
-                        ? 'text-emerald-600 dark:text-emerald-400'
-                        : 'text-slate-900 dark:text-slate-100'
-                    }`}
-                  >
-                    {tx.type === 'income' ? '+' : '-'}
-                    {formatCurrency(tx.amount)}
+                  <span className="text-sm font-bold shrink-0 ml-3"
+                    style={{ color: tx.type === 'income' ? 'var(--success)' : 'var(--text-primary)' }}>
+                    {tx.type === 'income' ? '+' : '-'}{formatCurrency(tx.amount)}
                   </span>
                 </div>
               ))}

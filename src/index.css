@@ -1,107 +1,163 @@
 @import "tailwindcss";
 
-@layer base {
-  :root {
-    --background: 210 40% 98%;
-    --foreground: 222 47% 11%;
+/* ─────────────────────────────────────────
+   PREMIUM OBSIDIAN DESIGN SYSTEM
+   WalletWise — Global Tokens & Base Styles
+───────────────────────────────────────── */
 
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+:root {
+  /* Core Backgrounds */
+  --bg-primary:         #121212;   /* Deep Charcoal Black */
+  --bg-surface:         #1A1A24;   /* Dark Obsidian — cards, modals, sidebar */
+  --bg-surface-2:       #222232;   /* Slightly elevated surface */
+  --bg-surface-3:       #2A2A3A;   /* Input fields, hover states */
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+  /* Brand Accents */
+  --accent-gold:        #D97706;   /* Muted Gold / Bronze — primary brand */
+  --accent-gold-hover:  #B45309;   /* Gold hover state */
+  --accent-gold-subtle: rgba(217, 119, 6, 0.12);
+  --accent-indigo:      #4F46E5;   /* Electric Indigo — secondary accent */
+  --accent-indigo-subtle: rgba(79, 70, 229, 0.12);
 
-    /* Indigo / Violet Primary (243 75% 59%) per spec */
-    --primary: 243 75% 59%;
-    --primary-foreground: 210 40% 98%;
+  /* Semantic Colors */
+  --success:            #22C55E;   /* Vibrant Green — income, active, gain */
+  --success-subtle:     rgba(34, 197, 94, 0.12);
+  --danger:             #EF4444;   /* Coral Red — expenses, alerts, loss */
+  --danger-subtle:      rgba(239, 68, 68, 0.12);
+  --warning:            #F59E0B;   /* Amber — warning states */
+  --warning-subtle:     rgba(245, 158, 11, 0.12);
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222 47% 11.2%;
+  /* Typography */
+  --text-primary:       #E2E8F0;   /* Soft Platinum — high-readability headings */
+  --text-secondary:     #94A3B8;   /* Slate Gray — muted labels, secondary */
+  --text-disabled:      #4B5563;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+  /* Borders */
+  --border:             #2D2D3A;   /* Subtle dark border */
+  --border-strong:      #3D3D4E;
 
-    --accent: 243 75% 96%;
-    --accent-foreground: 243 75% 45%;
+  /* Shadows */
+  --shadow-card:        0 4px 20px rgba(0, 0, 0, 0.6);
+  --shadow-gold:        0 4px 20px rgba(217, 119, 6, 0.25);
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-
-    --warning: 38 92% 50%;
-    --warning-foreground: 48 96% 12%;
-
-    --success: 142 76% 36%;
-    --success-foreground: 355 100% 97%;
-
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 243 75% 59%;
-
-    --radius: 0.75rem;
-  }
-
-  .dark {
-    --background: 224 71% 4%;
-    --foreground: 213 31% 91%;
-
-    --card: 224 71% 6%;
-    --card-foreground: 213 31% 91%;
-
-    --popover: 224 71% 6%;
-    --popover-foreground: 213 31% 91%;
-
-    --primary: 243 75% 65%;
-    --primary-foreground: 222 47% 11%;
-
-    --secondary: 215 27.9% 16.9%;
-    --secondary-foreground: 210 20% 98%;
-
-    --muted: 215 27.9% 16.9%;
-    --muted-foreground: 217.9 10.6% 64.9%;
-
-    --accent: 215 27.9% 16.9%;
-    --accent-foreground: 210 20% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 20% 98%;
-
-    --warning: 38 92% 50%;
-    --warning-foreground: 48 96% 12%;
-
-    --success: 142 76% 45%;
-    --success-foreground: 142 76% 96%;
-
-    --border: 215 27.9% 16.9%;
-    --input: 215 27.9% 16.9%;
-    --ring: 243 75% 65%;
-  }
+  /* Radius */
+  --radius:             0.75rem;
 }
 
-* {
-  border-color: hsl(var(--border));
+/* ─────────────────────────────────────────
+   TAILWIND v4 THEME BRIDGE
+   Exposes the tokens above as utilities:
+   bg-ink / bg-surface / bg-surface-2 / bg-surface-3
+   text-platinum / text-muted / text-disabled
+   border-hairline / border-hairline-strong
+   bg-gold / hover:bg-gold-hover / text-gold / ring-gold
+   bg-indigo / text-indigo / ring-indigo
+   text-success / text-danger / text-warning
+   text-ink (near-black on gold/red buttons)
+   shadow-card / shadow-gold
+   Opacity modifiers (e.g. bg-success/10) work as usual.
+───────────────────────────────────────────── */
+@theme {
+  /* Backgrounds */
+  --color-ink:        var(--bg-primary);
+  --color-surface:    var(--bg-surface);
+  --color-surface-2:  var(--bg-surface-2);
+  --color-surface-3:  var(--bg-surface-3);
+
+  /* Brand accents */
+  --color-gold:       var(--accent-gold);
+  --color-gold-hover: var(--accent-gold-hover);
+  --color-indigo:     var(--accent-indigo);
+
+  /* Semantic */
+  --color-success:    var(--success);
+  --color-danger:     var(--danger);
+  --color-warning:    var(--warning);
+
+  /* Typography */
+  --color-platinum:   var(--text-primary);
+  --color-muted:      var(--text-secondary);
+  --color-disabled:   var(--text-disabled);
+
+  /* Borders */
+  --color-hairline:        var(--border);
+  --color-hairline-strong: var(--border-strong);
+
+  /* Shadows — keep in sync with --shadow-* above */
+  --shadow-card:  0 4px 20px rgba(0, 0, 0, 0.6);
+  --shadow-gold:  0 4px 20px rgba(217, 119, 6, 0.25);
+}
+
+/* ─────────── Force always-dark ─────────── */
+html, body, #root {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  color-scheme: dark;
 }
 
 body {
-  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  background-color: hsl(var(--background));
-  color: hsl(var(--foreground));
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   margin: 0;
   padding: 0;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100dvh;
 }
 
-/* Custom scrollbars */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
+/* ─────────── Custom Scrollbars ─────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted-foreground) / 0.3);
+  background: var(--border-strong);
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground) / 0.5);
+  background: var(--accent-gold);
+}
+
+/* ─────────── Recharts Tooltip ─────────── */
+.recharts-tooltip-wrapper .recharts-default-tooltip {
+  background-color: var(--bg-surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 0.75rem !important;
+}
+
+/* ─────────── Selection ─────────── */
+::selection {
+  background-color: var(--accent-gold);
+  color: #000;
+}
+
+/* ─────────── Animations ─────────── */
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-slide-up {
+  animation: fadeSlideUp 0.25s ease-out;
+}
+
+@keyframes slideInLeft {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
+}
+
+@keyframes slideInTop {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-in { animation: slideInTop 0.2s ease-out; }
+
+/* ─────────── Gold shimmer on brand title ─────────── */
+.brand-title {
+  background: linear-gradient(135deg, #D97706 0%, #F59E0B 50%, #D97706 100%);
+  background-size: 200% auto;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer 4s linear infinite;
+}
+@keyframes shimmer {
+  from { background-position: 200% center; }
+  to   { background-position: -200% center; }
 }

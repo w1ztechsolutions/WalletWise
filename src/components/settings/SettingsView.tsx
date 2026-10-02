@@ -301,13 +301,13 @@ export const SettingsView: React.FC = () => {
   return (
     <div className="space-y-6 pb-20 md:pb-6">
       {/* Sub Tabs */}
-      <div className="flex items-center gap-2 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-2xl w-fit">
+      <div className="flex items-center gap-2 p-1 bg-surface-2 rounded-2xl w-fit">
         <button
           onClick={() => setActiveSettingsTab('categories')}
           className={`px-4 py-2 text-xs font-semibold rounded-xl transition-all ${
             activeSettingsTab === 'categories'
-              ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-sm'
-              : 'text-slate-500 hover:text-slate-900 dark:text-slate-400'
+              ? 'bg-surface text-platinum shadow-card'
+              : 'text-muted hover:text-platinum text-muted'
           }`}
         >
           Categories
@@ -316,8 +316,8 @@ export const SettingsView: React.FC = () => {
           onClick={() => setActiveSettingsTab('import')}
           className={`px-4 py-2 text-xs font-semibold rounded-xl transition-all ${
             activeSettingsTab === 'import'
-              ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-sm'
-              : 'text-slate-500 hover:text-slate-900 dark:text-slate-400'
+              ? 'bg-surface text-platinum shadow-card'
+              : 'text-muted hover:text-platinum text-muted'
           }`}
         >
           Excel & Templates
@@ -326,8 +326,8 @@ export const SettingsView: React.FC = () => {
           onClick={() => setActiveSettingsTab('reports')}
           className={`px-4 py-2 text-xs font-semibold rounded-xl transition-all ${
             activeSettingsTab === 'reports'
-              ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-sm'
-              : 'text-slate-500 hover:text-slate-900 dark:text-slate-400'
+              ? 'bg-surface text-platinum shadow-card'
+              : 'text-muted hover:text-platinum text-muted'
           }`}
         >
           Export Reports
@@ -339,10 +339,10 @@ export const SettingsView: React.FC = () => {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+              <h3 className="text-base font-bold text-platinum">
                 Categories
               </h3>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-muted">
                 Manage income and expense classifications for transactions and budgets.
               </p>
             </div>
@@ -357,7 +357,7 @@ export const SettingsView: React.FC = () => {
                 })
                 setIsCategoryModalOpen(true)
               }}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-sm transition-all"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gold hover:bg-gold-hover text-ink shadow-gold text-xs font-semibold transition-all"
             >
               <Plus className="w-4 h-4" />
               <span>Add Category</span>
@@ -368,7 +368,7 @@ export const SettingsView: React.FC = () => {
             {categories.map((cat) => (
               <div
                 key={cat.id}
-                className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex items-center justify-between group"
+                className="bg-surface p-4 rounded-2xl border border-hairline shadow-card flex items-center justify-between group"
               >
                 <div className="flex items-center gap-3">
                   <span
@@ -376,10 +376,10 @@ export const SettingsView: React.FC = () => {
                     style={{ backgroundColor: cat.color }}
                   />
                   <div>
-                    <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                    <h4 className="text-sm font-semibold text-platinum">
                       {cat.name}
                     </h4>
-                    <span className="text-[11px] font-medium capitalize text-slate-400">
+                    <span className="text-[11px] font-medium capitalize text-muted">
                       {cat.type}
                     </span>
                   </div>
@@ -388,14 +388,14 @@ export const SettingsView: React.FC = () => {
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
                     onClick={() => openEditCategory(cat)}
-                    className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
+                    className="p-1.5 text-muted hover:text-indigo rounded-lg hover:bg-surface-3"
                     title="Edit category"
                   >
                     <Edit2 className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={() => deleteCategory(cat.id)}
-                    className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/50"
+                    className="p-1.5 text-muted hover:text-danger rounded-lg hover:bg-danger/10"
                     title="Delete category"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -411,20 +411,20 @@ export const SettingsView: React.FC = () => {
       {activeSettingsTab === 'import' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* File Dropzone */}
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
+          <div className="bg-surface p-6 rounded-2xl border border-hairline shadow-card space-y-4">
             <div className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-indigo-600" />
-              <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+              <Sparkles className="w-5 h-5 text-indigo" />
+              <h3 className="text-base font-bold text-platinum">
                 AI Excel & CSV Spreadsheet Import
               </h3>
             </div>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-muted">
               Upload bank statements, budgeting sheets, or expense exports (.xlsx, .xls, .csv).
               The engine automatically normalizes columns, categorizes records, and batch inserts
               data scoped to your account.
             </p>
 
-            <div className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-8 text-center hover:border-indigo-500 transition-colors relative cursor-pointer group bg-slate-50/50 dark:bg-slate-800/20">
+            <div className="border-2 border-dashed border-hairline rounded-2xl p-8 text-center hover:border-indigo transition-colors relative cursor-pointer group bg-surface-3/50">
               <input
                 type="file"
                 accept=".xlsx,.xls,.csv"
@@ -432,23 +432,23 @@ export const SettingsView: React.FC = () => {
                 disabled={isImporting}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               />
-              <UploadCloud className="w-10 h-10 text-indigo-500 mx-auto mb-2 group-hover:scale-110 transition-transform" />
-              <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+              <UploadCloud className="w-10 h-10 text-indigo mx-auto mb-2 group-hover:scale-110 transition-transform" />
+              <p className="text-sm font-semibold text-platinum">
                 Click or drag Excel/CSV file here
               </p>
-              <p className="text-xs text-slate-400 mt-1">Supports multi-sheet workbooks up to 10MB</p>
+              <p className="text-xs text-muted mt-1">Supports multi-sheet workbooks up to 10MB</p>
             </div>
 
             {isImporting && (
-              <div className="p-4 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 text-xs text-indigo-900 dark:text-indigo-200 flex items-center gap-3">
-                <div className="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+              <div className="p-4 rounded-xl bg-indigo/10 border border-indigo/40 text-xs text-platinum flex items-center gap-3">
+                <div className="w-4 h-4 border-2 border-indigo border-t-transparent rounded-full animate-spin" />
                 <span>{importStatus}</span>
               </div>
             )}
 
             {importProgress && !isImporting && (
-              <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 text-xs text-emerald-900 dark:text-emerald-200 flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              <div className="p-4 rounded-xl bg-success/10 border border-success/40 text-xs text-platinum flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-success" />
                 <span>
                   Successfully imported {importProgress.transactionsCount} transactions and{' '}
                   {importProgress.budgetsCount} budgets.
@@ -458,48 +458,48 @@ export const SettingsView: React.FC = () => {
           </div>
 
           {/* Download CSV Templates */}
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
-            <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+          <div className="bg-surface p-6 rounded-2xl border border-hairline shadow-card space-y-4">
+            <h3 className="text-base font-bold text-platinum">
               Starter CSV Templates
             </h3>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-muted">
               Need a standardized layout for manual data entry? Download pre-formatted CSV templates
               ready for upload.
             </p>
 
             <div className="space-y-3 pt-2">
-              <div className="flex items-center justify-between p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40">
+              <div className="flex items-center justify-between p-3.5 rounded-xl border border-hairline bg-surface-3/40">
                 <div className="flex items-center gap-3">
-                  <FileSpreadsheet className="w-5 h-5 text-indigo-600" />
+                  <FileSpreadsheet className="w-5 h-5 text-indigo" />
                   <div>
-                    <p className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                    <p className="text-xs font-bold text-platinum">
                       Transactions Template (.csv)
                     </p>
-                    <p className="text-[11px] text-slate-400">Date, Description, Category, Amount, Type</p>
+                    <p className="text-[11px] text-muted">Date, Description, Category, Amount, Type</p>
                   </div>
                 </div>
                 <button
                   onClick={() => downloadTemplate('transactions')}
-                  className="p-2 rounded-xl text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950 transition-colors"
+                  className="p-2 rounded-xl text-indigo hover:bg-indigo/15 transition-colors"
                   title="Download template"
                 >
                   <Download className="w-4 h-4" />
                 </button>
               </div>
 
-              <div className="flex items-center justify-between p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40">
+              <div className="flex items-center justify-between p-3.5 rounded-xl border border-hairline bg-surface-3/40">
                 <div className="flex items-center gap-3">
-                  <FileSpreadsheet className="w-5 h-5 text-emerald-600" />
+                  <FileSpreadsheet className="w-5 h-5 text-success" />
                   <div>
-                    <p className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                    <p className="text-xs font-bold text-platinum">
                       Budgets Template (.csv)
                     </p>
-                    <p className="text-[11px] text-slate-400">Month, Category, PlannedAmount, Notes</p>
+                    <p className="text-[11px] text-muted">Month, Category, PlannedAmount, Notes</p>
                   </div>
                 </div>
                 <button
                   onClick={() => downloadTemplate('budgets')}
-                  className="p-2 rounded-xl text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950 transition-colors"
+                  className="p-2 rounded-xl text-success hover:bg-success/10 transition-colors"
                   title="Download template"
                 >
                   <Download className="w-4 h-4" />
@@ -512,37 +512,37 @@ export const SettingsView: React.FC = () => {
 
       {/* 3. Reports & Export */}
       {activeSettingsTab === 'reports' && (
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-6">
+        <div className="bg-surface p-6 rounded-2xl border border-hairline shadow-card space-y-6">
           <div>
-            <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+            <h3 className="text-base font-bold text-platinum">
               Financial Reports & Data Export
             </h3>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-muted">
               Filter records by month or type, preview totals, and download in CSV or JSON format.
             </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+              <label className="block text-xs font-medium text-muted mb-1">
                 Filter by Month
               </label>
               <input
                 type="month"
                 value={reportMonth}
                 onChange={(e) => setReportMonth(e.target.value)}
-                className="w-full px-3 py-2 text-sm rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100"
+                className="w-full px-3 py-2 text-sm rounded-xl bg-surface-3 border border-hairline text-platinum"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+              <label className="block text-xs font-medium text-muted mb-1">
                 Filter by Type
               </label>
               <select
                 value={reportType}
                 onChange={(e) => setReportType(e.target.value as any)}
-                className="w-full px-3 py-2 text-sm rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100"
+                className="w-full px-3 py-2 text-sm rounded-xl bg-surface-3 border border-hairline text-platinum"
               >
                 <option value="all">All Types</option>
                 <option value="income">Income Only</option>
@@ -552,17 +552,17 @@ export const SettingsView: React.FC = () => {
           </div>
 
           {/* Report Preview */}
-          <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="p-4 rounded-2xl bg-surface-3/50 border border-hairline flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-6">
               <div>
-                <span className="text-[11px] text-slate-400">Matching Records</span>
-                <p className="text-base font-bold text-slate-900 dark:text-slate-100">
+                <span className="text-[11px] text-muted">Matching Records</span>
+                <p className="text-base font-bold text-platinum">
                   {filteredReport.length}
                 </p>
               </div>
               <div>
-                <span className="text-[11px] text-slate-400">Total Volume</span>
-                <p className="text-base font-bold text-slate-900 dark:text-slate-100">
+                <span className="text-[11px] text-muted">Total Volume</span>
+                <p className="text-base font-bold text-platinum">
                   {formatCurrency(filteredReport.reduce((sum, t) => sum + t.amount, 0))}
                 </p>
               </div>
@@ -571,14 +571,14 @@ export const SettingsView: React.FC = () => {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => exportReport('csv')}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-sm transition-all"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gold hover:bg-gold-hover text-ink shadow-gold text-xs font-semibold transition-all"
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>Export CSV</span>
               </button>
               <button
                 onClick={() => exportReport('json')}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-100 text-xs font-semibold transition-all"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-surface-3 hover:bg-hairline text-platinum text-xs font-semibold transition-all"
               >
                 <FileJson className="w-3.5 h-3.5" />
                 <span>Export JSON</span>
@@ -590,15 +590,15 @@ export const SettingsView: React.FC = () => {
 
       {/* Category Modal */}
       {isCategoryModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
-              <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/80 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-surface rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-hairline">
+            <div className="flex items-center justify-between pb-4 border-b border-hairline">
+              <h3 className="text-base font-bold text-platinum">
                 {editingCategory ? 'Edit Category' : 'Create Category'}
               </h3>
               <button
                 onClick={() => setIsCategoryModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-1"
+                className="text-muted hover:text-platinum p-1"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -606,7 +606,7 @@ export const SettingsView: React.FC = () => {
 
             <form onSubmit={handleSaveCategory} className="space-y-4 mt-4">
               <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                <label className="block text-xs font-medium text-muted mb-1">
                   Category Name *
                 </label>
                 <input
@@ -615,12 +615,12 @@ export const SettingsView: React.FC = () => {
                   placeholder="e.g. Subscriptions, Groceries"
                   value={categoryFormData.name}
                   onChange={(e) => setCategoryFormData({ ...categoryFormData, name: e.target.value })}
-                  className="w-full px-3 py-2 text-sm rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-3 py-2 text-sm rounded-xl bg-surface-3 border border-hairline text-platinum focus:outline-none focus:ring-2 focus:ring-indigo"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+                <label className="block text-xs font-medium text-muted mb-1">
                   Type *
                 </label>
                 <div className="grid grid-cols-2 gap-2">
@@ -629,8 +629,8 @@ export const SettingsView: React.FC = () => {
                     onClick={() => setCategoryFormData({ ...categoryFormData, type: 'expense' })}
                     className={`py-2 text-xs font-semibold rounded-xl border ${
                       categoryFormData.type === 'expense'
-                        ? 'border-rose-500 bg-rose-50 dark:bg-rose-950/60 text-rose-600'
-                        : 'border-slate-200 dark:border-slate-700 text-slate-600'
+                        ? 'border-danger bg-danger/10 text-danger'
+                        : 'border-hairline text-muted'
                     }`}
                   >
                     Expense
@@ -640,8 +640,8 @@ export const SettingsView: React.FC = () => {
                     onClick={() => setCategoryFormData({ ...categoryFormData, type: 'income' })}
                     className={`py-2 text-xs font-semibold rounded-xl border ${
                       categoryFormData.type === 'income'
-                        ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600'
-                        : 'border-slate-200 dark:border-slate-700 text-slate-600'
+                        ? 'border-success bg-success/10 text-success'
+                        : 'border-hairline text-muted'
                     }`}
                   >
                     Income
@@ -650,7 +650,7 @@ export const SettingsView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                <label className="block text-xs font-medium text-muted mb-1.5">
                   Color Tag
                 </label>
                 <div className="flex flex-wrap gap-2">
@@ -660,7 +660,7 @@ export const SettingsView: React.FC = () => {
                       type="button"
                       onClick={() => setCategoryFormData({ ...categoryFormData, color: col })}
                       className={`w-6 h-6 rounded-full transition-transform ${
-                        categoryFormData.color === col ? 'scale-125 ring-2 ring-indigo-500 ring-offset-2' : ''
+                        categoryFormData.color === col ? 'scale-125 ring-2 ring-gold ring-offset-2 ring-offset-surface' : ''
                       }`}
                       style={{ backgroundColor: col }}
                     />
@@ -668,17 +668,17 @@ export const SettingsView: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-hairline">
                 <button
                   type="button"
                   onClick={() => setIsCategoryModalOpen(false)}
-                  className="px-4 py-2 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl"
+                  className="px-4 py-2 text-xs font-medium text-muted hover:bg-surface-3 rounded-xl"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-sm"
+                  className="px-5 py-2 text-xs font-semibold bg-gold hover:bg-gold-hover text-ink shadow-gold rounded-xl"
                 >
                   Save Category
                 </button>

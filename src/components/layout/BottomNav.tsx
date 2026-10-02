@@ -1,38 +1,59 @@
 import React from 'react'
-import { NAV_ITEMS, type NavTab } from './Sidebar'
+import { LayoutDashboard, Receipt, WalletCards, PiggyBank, BarChart3, Settings } from 'lucide-react'
+import type { NavTab } from './Sidebar'
 
 interface BottomNavProps {
   activeTab: NavTab
   onSelectTab: (tab: NavTab) => void
 }
 
-export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onSelectTab }) => {
-  return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-lg border-t border-slate-200 dark:border-slate-800 pb-[env(safe-area-inset-bottom)]">
-      <div className="grid grid-cols-6 h-16 items-center px-1">
-        {NAV_ITEMS.map((item) => {
-          const Icon = item.icon
-          const isActive = activeTab === item.id
-          return (
-            <button
-              key={item.id}
-              onClick={() => onSelectTab(item.id)}
-              className={`flex flex-col items-center justify-center h-full transition-colors ${
-                isActive
-                  ? 'text-indigo-600 dark:text-indigo-400 font-semibold'
-                  : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
-              }`}
+const NAV_ITEMS: { id: NavTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { id: 'dashboard',    label: 'Home',    icon: LayoutDashboard },
+  { id: 'transactions', label: 'Records', icon: Receipt },
+  { id: 'accounts',     label: 'Wallets', icon: WalletCards },
+  { id: 'budgets',      label: 'Budgets', icon: PiggyBank },
+  { id: 'analytics',    label: 'Charts',  icon: BarChart3 },
+  { id: 'settings',     label: 'Settings',icon: Settings },
+]
+
+export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onSelectTab }) => (
+  <nav
+    className="fixed bottom-0 inset-x-0 z-30 sm:hidden"
+    style={{
+      backgroundColor: 'rgba(26, 26, 36, 0.95)',
+      backdropFilter: 'blur(16px)',
+      borderTop: '1px solid var(--border)',
+    }}
+  >
+    <div className="grid grid-cols-6 h-16">
+      {NAV_ITEMS.map((item) => {
+        const Icon = item.icon
+        const isActive = activeTab === item.id
+        return (
+          <button
+            key={item.id}
+            onClick={() => onSelectTab(item.id)}
+            className="flex flex-col items-center justify-center gap-0.5 transition-all active:scale-95"
+            aria-label={item.label}
+          >
+            <div
+              className={`p-1.5 rounded-xl transition-all ${isActive ? 'scale-110' : ''}`}
+              style={{
+                backgroundColor: isActive ? 'var(--accent-gold-subtle)' : 'transparent',
+                color: isActive ? 'var(--accent-gold)' : 'var(--text-disabled)',
+              }}
             >
-              <div className={`p-1 rounded-xl transition-all ${isActive ? 'bg-indigo-50 dark:bg-indigo-950/60' : ''}`}>
-                <Icon className={`w-5 h-5 ${isActive ? 'stroke-[2.5px]' : 'stroke-2'}`} />
-              </div>
-              <span className="text-[10px] tracking-tight mt-0.5 truncate max-w-[48px]">
-                {item.label}
-              </span>
-            </button>
-          )
-        })}
-      </div>
-    </nav>
-  )
-}
+              <Icon className="w-5 h-5" />
+            </div>
+            <span
+              className="text-[10px] font-medium leading-none"
+              style={{ color: isActive ? 'var(--accent-gold)' : 'var(--text-disabled)' }}
+            >
+              {item.label}
+            </span>
+          </button>
+        )
+      })}
+    </div>
+  </nav>
+)

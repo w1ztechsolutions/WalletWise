@@ -8,7 +8,6 @@ import {
   Settings,
   LogOut,
   X,
-  UserCircle,
 } from 'lucide-react'
 import { useFinance } from '@/context/FinanceContext'
 
@@ -22,53 +21,61 @@ interface SidebarProps {
 }
 
 export const NAV_ITEMS: { id: NavTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'dashboard',    label: 'Dashboard',    icon: LayoutDashboard },
   { id: 'transactions', label: 'Transactions', icon: Receipt },
-  { id: 'accounts', label: 'Accounts', icon: WalletCards },
-  { id: 'budgets', label: 'Budgets', icon: PiggyBank },
-  { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-  { id: 'settings', label: 'Settings', icon: Settings },
+  { id: 'accounts',     label: 'Accounts',     icon: WalletCards },
+  { id: 'budgets',      label: 'Budgets',      icon: PiggyBank },
+  { id: 'analytics',    label: 'Analytics',    icon: BarChart3 },
+  { id: 'settings',     label: 'Settings',     icon: Settings },
 ]
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, activeTab, onSelectTab }) => {
   const { currentUser, setCurrentUser, addToast } = useFinance()
 
   const handleSignOut = () => {
-    // Multi-user switch demo / sign out
     addToast('Signed out', 'Session terminated. Switched to guest.', 'info')
-    setCurrentUser({
-      id: `usr_${Date.now()}`,
-      name: 'Guest User',
-      email: 'guest@walletwise.app',
-    })
+    setCurrentUser({ id: `usr_${Date.now()}`, name: 'Guest User', email: 'guest@walletwise.app' })
     onClose()
   }
 
   return (
     <>
-      {/* Backdrop overlay */}
+      {/* Dark backdrop overlay */}
       <div
-        className={`fixed inset-0 z-40 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-300 ${
+        className={`fixed inset-0 z-40 transition-opacity duration-300 ${
           isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
+        style={{ backgroundColor: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(4px)' }}
         onClick={onClose}
         aria-hidden="true"
       />
 
       {/* Slide-in Sidebar */}
       <aside
-        className={`fixed top-0 left-0 bottom-0 z-50 w-72 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col transition-transform duration-300 ease-in-out ${
+        className={`fixed top-0 left-0 bottom-0 z-50 w-72 flex flex-col transition-transform duration-300 ease-in-out ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
+        style={{
+          backgroundColor: 'var(--bg-surface)',
+          borderRight: '1px solid var(--border)',
+          boxShadow: '4px 0 40px rgba(0,0,0,0.8)',
+        }}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-slate-100 dark:border-slate-800">
-          <span className="text-xl font-bold tracking-tight text-indigo-600 dark:text-indigo-400">
-            WalletWise
-          </span>
+        {/* Header — WalletWise Branding */}
+        <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid var(--border)' }}>
+          <div className="flex items-center gap-2">
+            <div
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-black"
+              style={{ background: 'linear-gradient(135deg, #D97706, #B45309)', color: '#000' }}
+            >
+              W
+            </div>
+            <span className="text-lg font-bold brand-title">WalletWise</span>
+          </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition-colors"
+            className="p-1.5 rounded-lg transition-colors"
+            style={{ color: 'var(--text-secondary)' }}
             aria-label="Close sidebar"
           >
             <X className="w-5 h-5" />
@@ -76,50 +83,61 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, activeTab, on
         </div>
 
         {/* User Card */}
-        <div className="p-4 mx-4 mt-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-300 flex items-center justify-center font-semibold text-sm shrink-0">
+        <div
+          className="mx-4 mt-4 p-3 rounded-xl flex items-center gap-3"
+          style={{ backgroundColor: 'var(--bg-surface-2)', border: '1px solid var(--border)' }}
+        >
+          <div
+            className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0"
+            style={{ background: 'linear-gradient(135deg, #D97706, #B45309)', color: '#000' }}
+          >
             {currentUser.name.charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">
+            <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
               {currentUser.name}
             </p>
-            <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+            <p className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>
               {currentUser.email}
             </p>
           </div>
         </div>
 
-        {/* Navigation Items */}
-        <nav className="flex-1 px-4 py-4 space-y-1.5 overflow-y-auto">
+        {/* Navigation */}
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
           {NAV_ITEMS.map((item) => {
             const Icon = item.icon
             const isActive = activeTab === item.id
             return (
               <button
                 key={item.id}
-                onClick={() => {
-                  onSelectTab(item.id)
-                  onClose()
+                onClick={() => { onSelectTab(item.id); onClose() }}
+                className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all"
+                style={{
+                  backgroundColor: isActive ? 'var(--accent-gold-subtle)' : 'transparent',
+                  color: isActive ? 'var(--accent-gold)' : 'var(--text-secondary)',
+                  border: isActive ? '1px solid rgba(217, 119, 6, 0.3)' : '1px solid transparent',
                 }}
-                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                  isActive
-                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white'
-                }`}
               >
-                <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+                <Icon className={`w-4 h-4 shrink-0`} />
                 <span>{item.label}</span>
+                {isActive && (
+                  <div
+                    className="ml-auto w-1.5 h-1.5 rounded-full"
+                    style={{ backgroundColor: 'var(--accent-gold)' }}
+                  />
+                )}
               </button>
             )
           })}
         </nav>
 
-        {/* Footer with Sign Out */}
-        <div className="p-4 border-t border-slate-100 dark:border-slate-800">
+        {/* Sign Out */}
+        <div className="p-4" style={{ borderTop: '1px solid var(--border)' }}>
           <button
             onClick={handleSignOut}
-            className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/50 transition-colors"
+            className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors"
+            style={{ color: 'var(--danger)' }}
           >
             <LogOut className="w-4 h-4 shrink-0" />
             <span>Sign Out</span>

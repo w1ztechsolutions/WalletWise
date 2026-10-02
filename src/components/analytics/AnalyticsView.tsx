@@ -138,36 +138,36 @@ export const AnalyticsView: React.FC = () => {
     <div className="space-y-6 pb-20 md:pb-6">
       {/* 4 Stat Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-        <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm">
-          <span className="text-xs text-slate-500 font-medium">All-Time Income</span>
-          <p className="text-xl sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">
+        <div className="bg-surface rounded-2xl p-4 sm:p-5 border border-hairline shadow-card">
+          <span className="text-xs text-muted font-medium">All-Time Income</span>
+          <p className="text-xl sm:text-2xl font-bold text-success mt-1">
             +{formatCurrency(summary.income)}
           </p>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm">
-          <span className="text-xs text-slate-500 font-medium">All-Time Expenses</span>
-          <p className="text-xl sm:text-2xl font-bold text-rose-600 dark:text-rose-400 mt-1">
+        <div className="bg-surface rounded-2xl p-4 sm:p-5 border border-hairline shadow-card">
+          <span className="text-xs text-muted font-medium">All-Time Expenses</span>
+          <p className="text-xl sm:text-2xl font-bold text-danger mt-1">
             -{formatCurrency(summary.expenses)}
           </p>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm">
-          <span className="text-xs text-slate-500 font-medium">Net Savings</span>
+        <div className="bg-surface rounded-2xl p-4 sm:p-5 border border-hairline shadow-card">
+          <span className="text-xs text-muted font-medium">Net Savings</span>
           <p
             className={`text-xl sm:text-2xl font-bold mt-1 ${
-              summary.net >= 0 ? 'text-slate-900 dark:text-slate-100' : 'text-rose-600 dark:text-rose-400'
+              summary.net >= 0 ? 'text-success' : 'text-danger'
             }`}
           >
             {formatCurrency(summary.net)}
           </p>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm">
-          <span className="text-xs text-slate-500 font-medium">Overall Savings Rate</span>
+        <div className="bg-surface rounded-2xl p-4 sm:p-5 border border-hairline shadow-card">
+          <span className="text-xs text-muted font-medium">Overall Savings Rate</span>
           <div className="flex items-center gap-1 mt-1">
-            <TrendingUp className="w-5 h-5 text-emerald-500" />
-            <p className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100">
+            <TrendingUp className="w-5 h-5 text-success" />
+            <p className="text-xl sm:text-2xl font-bold text-platinum">
               {summary.savingsRate}%
             </p>
           </div>
@@ -175,18 +175,18 @@ export const AnalyticsView: React.FC = () => {
       </div>
 
       {/* Monthly Trend Chart */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm">
+      <div className="bg-surface rounded-2xl p-5 border border-hairline shadow-card">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+            <h3 className="text-base font-bold text-platinum">
               Monthly Income vs Expenses Trend
             </h3>
-            <p className="text-xs text-slate-400">Historical performance across all recorded periods</p>
+            <p className="text-xs text-muted">Historical performance across all recorded periods</p>
           </div>
         </div>
 
         {monthlyTrend.length === 0 ? (
-          <div className="py-12 text-center text-sm text-slate-500">No transaction data available</div>
+          <div className="py-12 text-center text-sm text-muted">No transaction data available</div>
         ) : (
           <div className="h-72 w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -196,19 +196,20 @@ export const AnalyticsView: React.FC = () => {
                 <Tooltip
                   formatter={(val: any) => [formatCurrency(Number(val)), '']}
                   contentStyle={{
-                    backgroundColor: 'hsl(var(--card))',
-                    borderColor: 'hsl(var(--border))',
+                    backgroundColor: '#1A1A24',
+                    borderColor: '#2D2D3A',
                     borderRadius: '0.75rem',
                     fontSize: '12px',
+                    color: '#E2E8F0',
                   }}
                 />
                 <Legend
                   verticalAlign="bottom"
                   height={36}
-                  formatter={(val) => <span className="text-xs text-slate-600 dark:text-slate-300">{val}</span>}
+                  formatter={(val) => <span className="text-xs text-muted">{val}</span>}
                 />
-                <Bar dataKey="Income" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={32} />
-                <Bar dataKey="Expenses" fill="#f43f5e" radius={[4, 4, 0, 0]} maxBarSize={32} />
+                <Bar dataKey="Income" fill="#22C55E" radius={[4, 4, 0, 0]} maxBarSize={32} />
+                <Bar dataKey="Expenses" fill="#EF4444" radius={[4, 4, 0, 0]} maxBarSize={32} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -218,16 +219,16 @@ export const AnalyticsView: React.FC = () => {
       {/* Grid: Category Breakdown Pie & Top Categories Ranked */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Pie Chart */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col">
+        <div className="bg-surface rounded-2xl p-5 border border-hairline shadow-card flex flex-col">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+            <h3 className="text-base font-bold text-platinum">
               Spending Distribution
             </h3>
-            <span className="text-xs text-slate-400">Top Categories + Other</span>
+            <span className="text-xs text-muted">Top Categories + Other</span>
           </div>
 
           {categoryPieData.items.length === 0 ? (
-            <div className="flex-1 flex items-center justify-center py-12 text-sm text-slate-500">
+            <div className="flex-1 flex items-center justify-center py-12 text-sm text-muted">
               No expenses recorded
             </div>
           ) : (
@@ -248,16 +249,17 @@ export const AnalyticsView: React.FC = () => {
                   <Tooltip
                     formatter={(val: any) => [formatCurrency(Number(val)), 'Total']}
                     contentStyle={{
-                      backgroundColor: 'hsl(var(--card))',
-                      borderColor: 'hsl(var(--border))',
+                      backgroundColor: '#1A1A24',
+                      borderColor: '#2D2D3A',
                       borderRadius: '0.75rem',
                       fontSize: '12px',
+                      color: '#E2E8F0',
                     }}
                   />
                   <Legend
                     verticalAlign="bottom"
                     height={36}
-                    formatter={(val) => <span className="text-xs text-slate-600 dark:text-slate-300">{val}</span>}
+                    formatter={(val) => <span className="text-xs text-muted">{val}</span>}
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -266,37 +268,37 @@ export const AnalyticsView: React.FC = () => {
         </div>
 
         {/* Top Spending Categories List */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm">
+        <div className="bg-surface rounded-2xl p-5 border border-hairline shadow-card">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+            <h3 className="text-base font-bold text-platinum">
               Top Spending Categories
             </h3>
-            <span className="text-xs text-slate-400">Ranked by volume</span>
+            <span className="text-xs text-muted">Ranked by volume</span>
           </div>
 
           {topSpendingRanked.length === 0 ? (
-            <div className="py-12 text-center text-sm text-slate-500">No expense records found</div>
+            <div className="py-12 text-center text-sm text-muted">No expense records found</div>
           ) : (
             <div className="space-y-4">
               {topSpendingRanked.map((item, idx) => (
                 <div key={item.name} className="space-y-1.5">
                   <div className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2">
-                      <span className="w-5 h-5 rounded-md bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-bold text-[10px] text-slate-500">
+                      <span className="w-5 h-5 rounded-md bg-surface-3 flex items-center justify-center font-bold text-[10px] text-muted">
                         {idx + 1}
                       </span>
                       <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">{item.name}</span>
+                      <span className="font-semibold text-platinum">{item.name}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-slate-900 dark:text-slate-100">
+                      <span className="font-bold text-platinum">
                         {formatCurrency(item.amount)}
                       </span>
-                      <span className="text-slate-400">({item.percentage}%)</span>
+                      <span className="text-muted">({item.percentage}%)</span>
                     </div>
                   </div>
 
-                  <div className="w-full h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                  <div className="w-full h-2 rounded-full bg-surface-3 overflow-hidden">
                     <div
                       className="h-full rounded-full transition-all duration-500"
                       style={{

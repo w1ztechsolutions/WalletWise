@@ -19,7 +19,7 @@ interface ToastMessage {
   id: string
   title: string
   description?: string
-  type?: 'success' | 'error' | 'info'
+  type?: 'success' | 'error' | 'info' | 'warning'
 }
 
 interface FinanceContextType {
@@ -30,7 +30,7 @@ interface FinanceContextType {
   budgets: Budget[]
   accounts: Account[]
   toasts: ToastMessage[]
-  addToast: (title: string, description?: string, type?: 'success' | 'error' | 'info') => void
+  addToast: (title: string, description?: string, type?: 'success' | 'error' | 'info' | 'warning') => void
   removeToast: (id: string) => void
   // Categories CRUD
   addCategory: (cat: Omit<Category, 'id' | 'created_by_id' | 'created_date' | 'updated_date'>) => Category
@@ -68,7 +68,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const [toasts, setToasts] = useState<ToastMessage[]>([])
 
-  const addToast = (title: string, description?: string, type: 'success' | 'error' | 'info' = 'success') => {
+  const addToast = (title: string, description?: string, type: 'success' | 'error' | 'info' | 'warning' = 'success') => {
     const id = Math.random().toString(36).substring(2, 9)
     setToasts((prev) => [...prev, { id, title, description, type }])
     setTimeout(() => {
