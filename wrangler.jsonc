@@ -4,6 +4,9 @@
   "pages_build_output_dir": "dist",
   "compatibility_date": "2024-11-01",
   "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "R2_BUCKET_NAME": "walletwise-storage"
+  },
   "d1_databases": [
     {
       "binding": "DB",

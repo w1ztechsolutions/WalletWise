@@ -11,9 +11,13 @@ import {
   Repeat,
   X,
   FileText,
+  Paperclip,
+  Eye,
 } from 'lucide-react'
 import { useFinance } from '@/context/FinanceContext'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { apiFetch } from '@/lib/api'
+import { validateFileForKind } from '@/lib/storagePolicy'
 import type { Transaction, TransactionType } from '@/types'
 
 interface TransactionsViewProps {
@@ -22,7 +26,7 @@ interface TransactionsViewProps {
 }
 
 export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOpen, setIsAddModalOpen }) => {
-  const { transactions, categories, addTransaction, updateTransaction, deleteTransaction } = useFinance()
+  const { transactions, categories, addTransaction, updateTransaction, deleteTransaction, addToast } = useFinance()
 
   // Filter States
   const [search, setSearch] = useState('')
@@ -43,6 +47,8 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
     type: TransactionType
     is_recurring: boolean
     notes: string
+    attachment_key: string | null
+    attachment_name: string
   }>({
     date: new Date().toISOString().split('T')[0],
     amount: '',
@@ -51,7 +57,13 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
     type: 'expense',
     is_recurring: false,
     notes: '',
+    attachment_key: null,
+    attachment_name: '',
   })
+
+  // Phase 6.5 — receipt picked in the dialog (uploaded on save)
+  const [receiptFile, setReceiptFile] = useState<File | null>(null)
+  const [isUploadingReceipt, setIsUploadingReceipt] = useState(false)
 
   const resetForm = () => {
     setFormData({
@@ -62,7 +74,10 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
       type: 'expense',
       is_recurring: false,
       notes: '',
+      attachment_key: null,
+      attachment_name: '',
     })
+    setReceiptFile(null)
     setEditingTransaction(null)
   }
 
@@ -76,11 +91,80 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
       type: tx.type,
       is_recurring: tx.is_recurring,
       notes: tx.notes || '',
+      attachment_key: tx.attachment_key ?? null,
+      attachment_name: tx.attachment_name || '',
     })
+    setReceiptFile(null)
     setIsAddModalOpen(true)
   }
 
-  const handleSave = (e: React.FormEvent) => {
+  // ---- Phase 6.5: receipt attachment helpers (private R2 storage) ----
+
+  /** Best-effort cleanup of an R2 object; orphaned keys are harmless. */
+  const deleteObjectQuiet = (key: string) => {
+    apiFetch('/storage/object', { method: 'DELETE', params: { key } }).catch(() => {
+      /* ignore — object cleanup must never block a user action */
+    })
+  }
+
+  /** Opens a short-lived presigned URL in a new tab (popup-blocker safe). */
+  const openReceipt = async (key: string) => {
+    const popup = window.open('about:blank', '_blank')
+    try {
+      const res = await apiFetch<{ downloadUrl: string }>('/storage/download-url', {
+        params: { key },
+      })
+      if (popup) popup.location.href = res.downloadUrl
+      else window.open(res.downloadUrl, '_blank', 'noopener')
+    } catch (err) {
+      popup?.close()
+      addToast(
+        'Unable to open receipt',
+        err instanceof Error ? err.message : 'Please try again.',
+        'error'
+      )
+    }
+  }
+
+  const handleReceiptSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const problem = validateFileForKind('receipt', file)
+    if (problem) {
+      addToast('Invalid receipt file', problem, 'error')
+      e.target.value = ''
+      return
+    }
+    setReceiptFile(file)
+    e.target.value = ''
+  }
+
+  /** Uploads the selected file via a presigned PUT; returns its object key. */
+  const uploadReceipt = async (file: File): Promise<string> => {
+    const up = await apiFetch<{ uploadUrl: string; key: string; contentType: string }>(
+      '/storage/upload-url',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          kind: 'receipt',
+          fileName: file.name,
+          contentType: file.type,
+          contentLength: file.size,
+        }),
+      }
+    )
+    const putRes = await fetch(up.uploadUrl, {
+      method: 'PUT',
+      headers: { 'Content-Type': up.contentType },
+      body: file,
+    })
+    if (!putRes.ok) {
+      throw new Error(`Storage responded with status ${putRes.status}`)
+    }
+    return up.key
+  }
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     const amt = parseFloat(formData.amount)
     if (isNaN(amt) || amt <= 0) return
@@ -88,28 +172,51 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
     const selectedCat = categories.find((c) => c.id === formData.category_id)
     const category_name = selectedCat?.name || 'General'
 
+    // Phase 6.5 — upload the receipt first so the record never references
+    // an object that failed to store.
+    const originalKey = editingTransaction?.attachment_key ?? null
+    let attachmentKey = formData.attachment_key
+    let attachmentName = formData.attachment_name || null
+
+    if (receiptFile) {
+      setIsUploadingReceipt(true)
+      try {
+        attachmentKey = await uploadReceipt(receiptFile)
+        attachmentName = receiptFile.name
+      } catch (err) {
+        addToast(
+          'Receipt upload failed',
+          err instanceof Error ? err.message : 'Unable to upload the receipt. Please try again.',
+          'error'
+        )
+        return
+      } finally {
+        setIsUploadingReceipt(false)
+      }
+    }
+
+    // If the original attachment was replaced or removed, clean it up.
+    if (originalKey && originalKey !== attachmentKey) {
+      deleteObjectQuiet(originalKey)
+    }
+
+    const payload = {
+      date: formData.date,
+      amount: amt,
+      description: formData.description.trim(),
+      category_id: formData.category_id,
+      category_name,
+      type: formData.type,
+      is_recurring: formData.is_recurring,
+      notes: formData.notes.trim(),
+      attachment_key: attachmentKey,
+      attachment_name: attachmentName,
+    }
+
     if (editingTransaction) {
-      updateTransaction(editingTransaction.id, {
-        date: formData.date,
-        amount: amt,
-        description: formData.description.trim(),
-        category_id: formData.category_id,
-        category_name,
-        type: formData.type,
-        is_recurring: formData.is_recurring,
-        notes: formData.notes.trim(),
-      })
+      updateTransaction(editingTransaction.id, payload)
     } else {
-      addTransaction({
-        date: formData.date,
-        amount: amt,
-        description: formData.description.trim(),
-        category_id: formData.category_id,
-        category_name,
-        type: formData.type,
-        is_recurring: formData.is_recurring,
-        notes: formData.notes.trim(),
-      })
+      addTransaction(payload)
     }
 
     setIsAddModalOpen(false)
@@ -312,6 +419,9 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
                           <p className="text-sm font-semibold text-platinum truncate">
                             {tx.description || tx.category_name}
                           </p>
+                          {tx.attachment_key && (
+                            <Paperclip className="w-3 h-3 text-indigo shrink-0" aria-label="Has receipt" />
+                          )}
                           {tx.is_recurring && (
                             <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-indigo/15 border border-indigo/40 text-platinum text-[10px] font-medium shrink-0">
                               <Repeat className="w-2.5 h-2.5" />
@@ -346,6 +456,15 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
 
                       {/* Actions: Edit & Delete (visible on hover / focus) */}
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {tx.attachment_key && (
+                          <button
+                            onClick={() => openReceipt(tx.attachment_key!)}
+                            className="p-1.5 text-muted hover:text-indigo hover:bg-surface-3 rounded-lg transition-colors"
+                            title="View receipt"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                         <button
                           onClick={() => openEdit(tx)}
                           className="p-1.5 text-muted hover:text-indigo hover:bg-surface-3 rounded-lg transition-colors"
@@ -522,6 +641,79 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
                 />
               </div>
 
+              {/* Receipt Attachment (Phase 6.5 — private R2 storage) */}
+              <div>
+                <label className="block text-xs font-medium text-muted mb-1">
+                  Receipt (optional)
+                </label>
+                {formData.attachment_key ? (
+                  <div className="flex items-center justify-between gap-2 p-3 rounded-xl border border-hairline bg-surface-3/40">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Paperclip className="w-4 h-4 text-indigo shrink-0" />
+                      <span className="text-xs text-platinum truncate">
+                        {formData.attachment_name || 'Receipt attached'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => formData.attachment_key && openReceipt(formData.attachment_key)}
+                        className="p-1.5 text-muted hover:text-indigo rounded-lg hover:bg-surface-3 transition-colors"
+                        title="View receipt"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFormData((prev) => ({ ...prev, attachment_key: null, attachment_name: '' }))
+                        }
+                        className="p-1.5 text-muted hover:text-danger rounded-lg hover:bg-surface-3 transition-colors"
+                        title="Remove receipt"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ) : receiptFile ? (
+                  <div className="flex items-center justify-between gap-2 p-3 rounded-xl border border-hairline bg-surface-3/40">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <FileText className="w-4 h-4 text-indigo shrink-0" />
+                      <span className="text-xs text-platinum truncate">{receiptFile.name}</span>
+                      <span className="text-[11px] text-muted shrink-0">
+                        {(receiptFile.size / 1024).toFixed(0)} KB
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setReceiptFile(null)}
+                      className="p-1.5 text-muted hover:text-danger rounded-lg hover:bg-surface-3 transition-colors"
+                      title="Discard selected receipt"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="flex items-center justify-center gap-2 w-full py-3 px-3 rounded-xl border-2 border-dashed border-hairline text-xs text-muted hover:border-indigo hover:text-platinum cursor-pointer transition-colors">
+                    <input
+                      type="file"
+                      accept=".pdf,.png,.jpg,.jpeg,.webp"
+                      onChange={handleReceiptSelect}
+                      disabled={isUploadingReceipt}
+                      className="sr-only"
+                    />
+                    <Paperclip className="w-3.5 h-3.5" />
+                    <span>Attach receipt (PDF/Image, max 5MB)</span>
+                  </label>
+                )}
+                {isUploadingReceipt && (
+                  <p className="text-[11px] text-indigo mt-1.5 flex items-center gap-1.5">
+                    <span className="w-3 h-3 border-2 border-indigo border-t-transparent rounded-full animate-spin inline-block" />
+                    Uploading receipt to secure storage…
+                  </p>
+                )}
+              </div>
+
               {/* Form Buttons */}
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-hairline">
                 <button
@@ -536,7 +728,8 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 text-xs font-semibold bg-gold hover:bg-gold-hover text-ink shadow-gold rounded-xl transition-all"
+                  disabled={isUploadingReceipt}
+                  className="px-5 py-2 text-xs font-semibold bg-gold hover:bg-gold-hover text-ink shadow-gold rounded-xl transition-all disabled:opacity-60 disabled:cursor-wait"
                 >
                   {editingTransaction ? 'Save Changes' : 'Record Transaction'}
                 </button>
@@ -565,7 +758,10 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
               </button>
               <button
                 onClick={() => {
+                  const tx = transactions.find((t) => t.id === deletingId)
                   deleteTransaction(deletingId)
+                  // Phase 6.5 — remove the private receipt object as well
+                  if (tx?.attachment_key) deleteObjectQuiet(tx.attachment_key)
                   setDeletingId(null)
                 }}
                 className="px-4 py-2 text-xs font-semibold bg-danger hover:bg-danger/90 text-ink rounded-xl"

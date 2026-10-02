@@ -12,6 +12,8 @@ Each bug is documented in its own individual file following the naming pattern: 
 | :-- | :-- | :-- | :-- | :-- |
 | BUG-001 | [BUG-001-git-dubious-ownership.md](./BUG-001-git-dubious-ownership.md) | Low | ✅ Resolved | 2026-10-02 |
 | BUG-002 | [BUG-002-typescript-6-config-and-imports.md](./BUG-002-typescript-6-config-and-imports.md) | Medium | ✅ Resolved | 2026-10-02 |
+| BUG-003 | [BUG-003-pages-functions-and-better-auth-startup.md](./BUG-003-pages-functions-and-better-auth-startup.md) | High | ✅ Resolved | 2026-10-02 |
+| BUG-004 | [BUG-004-deprecated-workers-ai-model.md](./BUG-004-deprecated-workers-ai-model.md) | High | ✅ Resolved | 2026-10-02 |
 
 ---
 

@@ -25,6 +25,9 @@ export const transactions = sqliteTable('transactions', {
   type: text('type', { enum: ['income', 'expense'] }).notNull(),
   is_recurring: integer('is_recurring', { mode: 'boolean' }).notNull().default(false),
   notes: text('notes'),
+  // Phase 6.5 — private R2 receipt attachment (users/{uid}/receipts/... key)
+  attachment_key: text('attachment_key'),
+  attachment_name: text('attachment_name'),
   created_date: text('created_date').notNull().default(sql`(CURRENT_TIMESTAMP)`),
   updated_date: text('updated_date').notNull().default(sql`(CURRENT_TIMESTAMP)`),
 })

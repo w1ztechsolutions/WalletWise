@@ -57,7 +57,7 @@ export const ToastContainer: React.FC = () => {
 interface ToastProps {
   id: string
   title: string
-  description: string
+  description?: string
   type: 'success' | 'error' | 'info' | 'warning'
   onRemove: (id: string) => void
 }

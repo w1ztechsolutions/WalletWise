@@ -11,7 +11,7 @@ WalletWise is a modern, responsive personal finance management web application e
 - **Database & ORM:** Cloudflare D1 (Serverless SQL / SQLite) operated via Drizzle ORM (`drizzle-orm/d1`) with strict per-user data isolation.
 - **Authentication:** Better Auth (running directly on D1 + Workers via Web Crypto API with secure HTTP-only cookies) supporting email/password and social login.
 - **Object Storage:** Cloudflare R2 for user file uploads (receipts, Excel files) with private time-limited signed URLs ($0 egress).
-- **AI Processing:** Cloudflare Workers AI (`@cf/meta/llama-3.1-8b-instruct`) for intelligent spreadsheet parsing and transaction/budget extraction.
+- **AI Processing:** Cloudflare Workers AI (`@cf/meta/llama-3.3-70b-instruct-fp8-fast`) for intelligent spreadsheet parsing and transaction/budget extraction.
 - **Hosting & CI/CD:** Cloudflare Pages with Git integration (push to GitHub `main` triggers automated build & deployment).
 
 ---
@@ -179,4 +179,48 @@ All records automatically include `id`, `created_date`, `updated_date`, and `cre
 - [x] Local server running at `http://127.0.0.1:5173/` (HTTP 200 OK verified).
 - [x] Git repository initialized and commits recorded.
 - [ ] Connect remote GitHub repository and push `main`.
-- [ ] Deploy to Cloudflare Pages & D1.
+ - [ ] Deploy to Cloudflare Pages & D1.
+
+### Phase 6: Cloudflare Fullstack Backend Implementation
+
+#### Phase 0: Frontend Quick Fixes
+- [x] Fix `ToastContainer` prop mismatch: rename `message` → `description` in `Toast.tsx` and remove conflicting 5s `useEffect` timer from component. Context's 4s `setTimeout` is now the single dismissal authority.
+- [x] Gate demo seed data (`transactions`, `budgets`, `accounts`) behind `import.meta.env.DEV` in `FinanceContext.tsx` so production starts empty while preserving `localStorage` reads when present.
+- [x] Verify feature-view styling (`TransactionsView`, `BudgetsView`, `AnalyticsView`, `SettingsView`, `AccountsView`) already uses CSS tokens (`bg-surface`, `text-platinum`, `border-hairline`); no mechanical refactor required.
+
+#### Phase 1: Currency Preference (Data Model)
+- [x] Update `formatCurrency` default from `'ZMW'` to `'MWK'` in `src/lib/utils.ts`.
+- [x] Extend `User` type with `currency?: string` in `src/types/index.ts`.
+- [x] Add `currency: text('currency').notNull().default('MWK')` to Better Auth `user` table in `src/db/schema.ts`.
+- [ ] Add Preferences sub-tab and currency dropdown in `SettingsView.tsx`; persist via `PATCH /api/user/me` (requires API layer).
+
+#### Phase 2: Better Auth on Cloudflare D1
+- [ ] Install `better-auth` and `@better-auth/d1-adapter`.
+- [ ] Create `src/lib/auth.ts` with D1 adapter, email/password provider, and `user.currency` inclusion.
+- [x] Create `functions/api/auth/[[all]].ts` mount point.
+- [ ] Create `functions/_middleware.ts` to verify session cookies and inject `userId`; reject unauthenticated requests with `401`.
+
+#### Phase 3: Workers CRUD API Layer
+- [ ] Implement transactions, accounts, budgets, categories, and user endpoints under `functions/api/`.
+- [ ] Enforce strict `created_by_id` scoping, input validation, and sanitized error responses.
+
+#### Phase 4: React Query Migration
+- [ ] Create `src/lib/api.ts` fetch client with `credentials: 'include'`.
+- [ ] Create React Query hooks (`useTransactions`, `useAccounts`, `useBudgets`, `useCategories`, `useUser`).
+- [ ] Refactor `FinanceContext` to delegate data operations to React Query; call `queryClient.clear()` on logout.
+- [ ] Update all views to use new hooks and invalidate relevant query keys on mutations.
+
+#### Phase 5: R2 Storage Endpoints
+- [x] Implement presigned URL generators for upload (`POST`) and download (`GET`).
+- [x] Integrate with `SettingsView` Excel upload and transaction receipt attachments.
+
+#### Phase 6: Workers AI Spreadsheet Parser
+- [x] Create `POST /api/ai/parse-spreadsheet` endpoint.
+- [x] Wire Workers AI (`@cf/meta/llama-3.3-70b-instruct-fp8-fast`) to normalize uploaded spreadsheets into transactions/budgets.
+
+#### Phase 7: Migrations, Testing, and Deploy
+- [ ] Run `drizzle-kit generate` and apply migrations (`--local` then `--remote`).
+- [ ] Seed default categories server-side on first signup.
+- [ ] Verify locally with `wrangler pages dev dist --compatibility-flag=nodejs_compat`.
+- [ ] Push to GitHub, connect Cloudflare Pages, set production bindings, and apply `wrangler secret put` for required secrets.
+

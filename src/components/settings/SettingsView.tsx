@@ -17,6 +17,9 @@ import {
 import * as XLSX from 'xlsx'
 import { useFinance } from '@/context/FinanceContext'
 import { formatCurrency, getCurrentMonth } from '@/lib/utils'
+import { apiFetch } from '@/lib/api'
+import { validateFileForKind } from '@/lib/storagePolicy'
+import { normalizeSheets, type RawBudget, type RawTransaction } from '@/lib/importParser'
 import type { Category, TransactionType, Transaction, Budget } from '@/types'
 
 const PRESET_CATEGORY_COLORS = [
@@ -31,6 +34,27 @@ const PRESET_CATEGORY_COLORS = [
   '#14b8a6',
   '#64748b',
 ]
+
+/** Response contract of `POST /api/ai/parse-spreadsheet` (Phase 6.6). */
+interface AiParseResponse {
+  transactions: RawTransaction[]
+  budgets: RawBudget[]
+  warnings: string[]
+  stats: {
+    sheets: number
+    rows: number
+    chunks: number
+    aiChunks: number
+    fallbackChunks: number
+    dropped: number
+  }
+  source: 'ai' | 'fallback' | 'mixed'
+}
+
+interface ImportSheet {
+  name: string
+  rows: Record<string, unknown>[]
+}
 
 export const SettingsView: React.FC = () => {
   const {
@@ -112,110 +136,149 @@ export const SettingsView: React.FC = () => {
     })
   }
 
-  // Excel File Upload & AI Normalization Parser
+  // Excel File Upload → R2 archive → Workers AI normalization (Phase 6.6)
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    e.target.value = ''
+
+    const invalid = validateFileForKind('import', file)
+    if (invalid) {
+      addToast('Invalid file', invalid, 'error')
+      return
+    }
 
     setIsImporting(true)
     setImportStatus('Reading spreadsheet sheets...')
 
     try {
+      // 1. Read the workbook client-side (SheetJS) into plain row objects.
       const data = await file.arrayBuffer()
       const workbook = XLSX.read(data, { type: 'array' })
-
-      setImportStatus('Parsing and normalizing transaction and budget records...')
-
-      const extractedTransactions: Omit<Transaction, 'id' | 'created_by_id'>[] = []
-      const extractedBudgets: Omit<Budget, 'id' | 'created_by_id'>[] = []
-
-      // Iterate through sheet names
-      workbook.SheetNames.forEach((sheetName) => {
+      const sheets: ImportSheet[] = workbook.SheetNames.map((sheetName) => {
         const worksheet = workbook.Sheets[sheetName]
-        const json: any[] = XLSX.utils.sheet_to_json(worksheet, { defval: '' })
+        const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(worksheet, { defval: '' })
+        return { name: sheetName, rows }
+      })
 
-        const isBudgetSheet = sheetName.toLowerCase().includes('budget')
-
-        json.forEach((row) => {
-          // Normalize column keys
-          const keys = Object.keys(row)
-          const findKey = (candidates: string[]) =>
-            keys.find((k) => candidates.some((c) => k.toLowerCase().includes(c)))
-
-          const dateKey = findKey(['date', 'time', 'day'])
-          const amountKey = findKey(['amount', 'cost', 'price', 'value', 'planned'])
-          const descKey = findKey(['description', 'item', 'details', 'name', 'memo', 'payee'])
-          const catKey = findKey(['category', 'type_name', 'group'])
-          const typeKey = findKey(['type', 'kind'])
-
-          const rawAmount = amountKey ? parseFloat(String(row[amountKey]).replace(/[^0-9.-]+/g, '')) : NaN
-          if (isNaN(rawAmount) || rawAmount <= 0) return
-
-          const catName = (catKey && String(row[catKey]).trim()) || 'General'
-          const description = (descKey && String(row[descKey]).trim()) || sheetName
-
-          // Match or create category
-          let matchedCat = categories.find((c) => c.name.toLowerCase() === catName.toLowerCase())
-          if (!matchedCat) {
-            const typeVal = typeKey ? String(row[typeKey]).toLowerCase() : ''
-            const guessedType: TransactionType =
-              typeVal.includes('income') || sheetName.toLowerCase().includes('income')
-                ? 'income'
-                : 'expense'
-            matchedCat = addCategory({
-              name: catName,
-              type: guessedType,
-              color: PRESET_CATEGORY_COLORS[Math.floor(Math.random() * PRESET_CATEGORY_COLORS.length)],
-              icon: 'Tag',
-            })
+      // 2. Archive the original file in private R2 storage (best-effort —
+      //    the import must still succeed when storage is not configured).
+      setImportStatus('Archiving original file to secure storage...')
+      try {
+        const archived = await apiFetch<{ uploadUrl: string; key: string; contentType: string }>(
+          '/storage/upload-url',
+          {
+            method: 'POST',
+            body: JSON.stringify({
+              kind: 'import',
+              fileName: file.name,
+              contentType: file.type,
+              contentLength: file.size,
+            }),
           }
+        )
+        const put = await fetch(archived.uploadUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': archived.contentType },
+          body: file,
+        })
+        if (!put.ok) throw new Error(`Storage responded with status ${put.status}`)
+      } catch {
+        addToast(
+          'Archive skipped',
+          'The original spreadsheet could not be archived; parsing continues.',
+          'info'
+        )
+      }
 
-          if (isBudgetSheet) {
-            extractedBudgets.push({
-              month: getCurrentMonth(),
-              category_id: matchedCat.id,
-              category_name: matchedCat.name,
-              planned_amount: rawAmount,
-              notes: `Imported from ${sheetName}`,
-            })
-          } else {
-            // Transaction
-            const typeVal = typeKey ? String(row[typeKey]).toLowerCase() : ''
-            const guessedType: TransactionType =
-              typeVal.includes('income') || sheetName.toLowerCase().includes('income')
-                ? 'income'
-                : 'expense'
+      // 3. Normalize records — Workers AI endpoint with a local deterministic
+      //    fallback when the API is unreachable (e.g. plain `npm run dev`).
+      setImportStatus('Normalizing records with Workers AI...')
+      const today = new Date().toISOString().split('T')[0]
+      let result: AiParseResponse
+      try {
+        result = await apiFetch<AiParseResponse>('/ai/parse-spreadsheet', {
+          method: 'POST',
+          body: JSON.stringify({
+            fileName: file.name,
+            defaultDate: today,
+            defaultMonth: today.slice(0, 7),
+            sheets,
+          }),
+        })
+      } catch {
+        addToast(
+          'AI parsing unavailable',
+          'Using standard column matching to normalize your spreadsheet.',
+          'info'
+        )
+        const fallback = normalizeSheets(sheets, {
+          defaultDate: today,
+          defaultMonth: today.slice(0, 7),
+        })
+        result = { ...fallback, source: 'fallback', stats: { sheets: sheets.length, rows: 0, chunks: 0, aiChunks: 0, fallbackChunks: 1, dropped: 0 } }
+      }
 
-            let dateStr = new Date().toISOString().split('T')[0]
-            if (dateKey && row[dateKey]) {
-              try {
-                const parsedDate = new Date(row[dateKey])
-                if (!isNaN(parsedDate.getTime())) {
-                  dateStr = parsedDate.toISOString().split('T')[0]
-                }
-              } catch {
-                // fallback to today
-              }
-            }
+      // 4. Resolve categories by name (create missing ones once).
+      setImportStatus('Matching categories...')
+      const categoryCache = new Map<string, Category>()
+      const resolveCategory = (name: string, type: TransactionType): Category => {
+        const key = name.trim().toLowerCase()
+        const cached = categoryCache.get(key)
+        if (cached) return cached
+        const existing = categories.find((c) => c.name.toLowerCase() === key)
+        if (existing) {
+          categoryCache.set(key, existing)
+          return existing
+        }
+        const created = addCategory({
+          name: name.trim() || 'General',
+          type,
+          color: PRESET_CATEGORY_COLORS[Math.floor(Math.random() * PRESET_CATEGORY_COLORS.length)],
+          icon: 'Tag',
+        })
+        categoryCache.set(key, created)
+        return created
+      }
 
-            extractedTransactions.push({
-              date: dateStr,
-              amount: rawAmount,
-              description,
-              category_id: matchedCat.id,
-              category_name: matchedCat.name,
-              type: guessedType,
-              is_recurring: false,
-              notes: `Imported from ${file.name}`,
-            })
+      const extractedTransactions: Omit<Transaction, 'id' | 'created_by_id'>[] =
+        result.transactions.map((t) => {
+          const cat = resolveCategory(t.category, t.type)
+          return {
+            date: t.date,
+            amount: t.amount,
+            description: t.description,
+            category_id: cat.id,
+            category_name: cat.name,
+            type: t.type,
+            is_recurring: t.is_recurring,
+            notes: `Imported from ${file.name}`,
           }
         })
+
+      const extractedBudgets: Omit<Budget, 'id' | 'created_by_id'>[] = result.budgets.map((b) => {
+        const cat = resolveCategory(b.category, 'expense')
+        return {
+          month: b.month,
+          category_id: cat.id,
+          category_name: cat.name,
+          planned_amount: b.planned_amount,
+          notes: `Imported from ${file.name}`,
+        }
       })
 
       setImportProgress({
         transactionsCount: extractedTransactions.length,
         budgetsCount: extractedBudgets.length,
       })
+
+      if (result.warnings.length > 0) {
+        addToast(
+          'Import notes',
+          result.warnings.slice(0, 2).join(' '),
+          result.source === 'ai' ? 'info' : 'warning'
+        )
+      }
 
       if (extractedTransactions.length > 0 || extractedBudgets.length > 0) {
         batchImport({

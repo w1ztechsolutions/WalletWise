@@ -23,6 +23,10 @@ export interface Transaction {
   type: TransactionType
   is_recurring: boolean
   notes?: string
+  /** Phase 6.5 — R2 key of the private receipt attachment (`users/{uid}/receipts/...`). */
+  attachment_key?: string | null
+  /** Original receipt file name for display. */
+  attachment_name?: string | null
   created_date?: string
   updated_date?: string
   created_by_id: string

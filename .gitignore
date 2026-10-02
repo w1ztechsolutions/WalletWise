@@ -17,6 +17,7 @@ dist-ssr
 .env
 .env.*
 !.env.example
+.dev.vars
 
 # Cloudflare Wrangler & D1 Local State
 .wrangler

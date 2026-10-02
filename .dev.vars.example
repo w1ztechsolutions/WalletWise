@@ -1,0 +1,23 @@
+# WalletWise — local development secrets
+#
+# Copy this file to `.dev.vars` (gitignored) for `wrangler pages dev`.
+# Never commit real credentials.
+#
+# R2 presigned URLs (Phase 6.5) require S3-compatible credentials, because the
+# R2 Workers binding cannot generate signed URLs itself:
+#   1. Cloudflare Dashboard → R2 → (your account) → Manage R2 API Tokens
+#      → Create API token → Object Read & Write, scoped to `walletwise-storage`
+#   2. Copy the "Access Key ID" / "Secret Access Key" values below.
+#   3. Your Account ID: Cloudflare Dashboard → right sidebar → Account ID.
+#
+# Production equivalent:
+#   npx wrangler secret put R2_ACCOUNT_ID
+#   npx wrangler secret put R2_ACCESS_KEY_ID
+#   npx wrangler secret put R2_SECRET_ACCESS_KEY
+
+R2_ACCOUNT_ID=your-cloudflare-account-id
+R2_ACCESS_KEY_ID=your-r2-access-key-id
+R2_SECRET_ACCESS_KEY=your-r2-secret-access-key
+
+# Optional local override (normally provided by wrangler.jsonc `vars`):
+# R2_BUCKET_NAME=walletwise-storage

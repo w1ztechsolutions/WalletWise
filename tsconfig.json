@@ -1,7 +1,15 @@
 {
   "files": [],
+  "compilerOptions": {
+    /* Ensures wrangler/esbuild resolves the `@/` alias for src/ files it bundles into functions/ */
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
   "references": [
     { "path": "./tsconfig.app.json" },
     { "path": "./tsconfig.node.json" }
   ]
 }
+

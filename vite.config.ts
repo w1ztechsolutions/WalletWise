@@ -14,4 +14,15 @@ export default defineConfig({
       '@': path.resolve(import.meta.dirname, './src'),
     },
   },
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:8788',
+        changeOrigin: true,
+        secure: false,
+        // NOTE: Vite's ProxyOptions has no `cookieDomain`; cookies are
+        // forwarded as-is to the local wrangler pages dev origin.
+      },
+    },
+  },
 })
