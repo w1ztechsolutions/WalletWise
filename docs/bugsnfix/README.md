@@ -4,26 +4,20 @@ This directory tracks all encountered issues, build/runtime bugs, edge cases, ro
 
 ---
 
-## Logging Format
-
-When an issue occurs, add an entry below or create an individual markdown file in this directory following this template:
-
-```markdown
-### [BUG-XXX] Short Title
-- **Date:** YYYY-MM-DD
-- **Severity:** Low | Medium | High | Critical
+### [BUG-001] Git dubious ownership detection on Windows during repository initialization
+- **Date:** 2026-10-02
+- **Severity:** Low
 - **Symptoms / Error Message:**
-  Description of what failed or the exact error output.
+  ```text
+  fatal: detected dubious ownership in repository at 'C:/Users/WIZTECH SOLUTIONS/Desktop/Projects/WalletWise'
+  'C:/Users/WIZTECH SOLUTIONS/Desktop/Projects/WalletWise' is owned by:
+    CHINKO/wisdo (S-1-5-21-4258414097-639853180-76571453-1001)
+  but the current user is:
+    CHINKO/WIZTECH SOLUTIONS (S-1-5-21-4258414097-639853180-76571453-1007)
+  ```
 - **Root Cause:**
-  Technical explanation of why the failure occurred.
+  Git security protections (introduced in CVE-2022-24765) prevent Git commands in directories where the folder owner SID does not match the active shell execution user SID.
 - **Fix Implemented:**
-  Code changes or configuration adjustments made.
+  Executed `git config --global --add safe.directory "C:/Users/WIZTECH SOLUTIONS/Desktop/Projects/WalletWise"`.
 - **Verification:**
-  How the fix was verified.
-```
-
----
-
-## Log Entries
-
-*No bugs currently recorded. Build is initializing.*
+  `git status` and `git commit` succeeded immediately with clean root-commit creation.
