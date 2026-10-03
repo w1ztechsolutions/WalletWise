@@ -44,6 +44,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenSidebar, activeTab, onOpen
           </button>
 
           <div className="flex items-center gap-2">
+            <img src="/logo_title_bar.jpg" alt="" className="w-7 h-7 rounded-md object-cover" />
             <span className="text-sm font-bold brand-title hidden sm:inline">WalletWise</span>
             <span className="hidden sm:inline" style={{ color: 'var(--border-strong)' }}>/</span>
             <h1 className="text-base sm:text-lg font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>

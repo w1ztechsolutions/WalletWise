@@ -113,16 +113,11 @@ export const AuthView: React.FC = () => {
       <div className="w-full max-w-sm">
         {/* Brand */}
         <div className="flex flex-col items-center mb-6">
-          <div
-            className="w-12 h-12 rounded-xl flex items-center justify-center text-lg font-black mb-3"
-            style={{ background: "linear-gradient(135deg, #D97706, #B45309)", color: "#000" }}
-          >
-            W
-          </div>
-          <h1 className="text-xl font-bold brand-title">WalletWise</h1>
-          <p className="text-xs mt-1" style={{ color: "var(--text-secondary)" }}>
-            Personal finance, backed by the cloud.
-          </p>
+          <img
+            src="/logo.jpg"
+            alt="WalletWise Personal Finance Tracker"
+            className="w-56 h-40 rounded-xl object-cover"
+          />
         </div>
 
         {/* Card */}
