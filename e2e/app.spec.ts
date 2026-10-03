@@ -1,4 +1,5 @@
 import { test, expect, signIn, requireCredentials, CREDENTIALS, trackRuntimeErrors, addRecordButton, type Page } from './helpers';
+import { readFile } from 'node:fs/promises';
 
 /**
  * Authenticated data flows — dashboard, accounts, transactions, budgets,
@@ -83,18 +84,133 @@ test.describe('authenticated app', () => {
     await expect(page.getByText(/Budgets for /)).not.toHaveText(before!);
   });
 
-  test('settings view exposes categories, import and export tabs', async ({ page }) => {
+  test('settings view exposes categories and date-range exports', async ({ page }) => {
     await openView(page, 'settings', /^Categories$/);
 
     await expect(page.getByRole('button', { name: 'Categories' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Excel & Templates' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Excel & Templates' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Export Reports' })).toBeVisible();
 
-    await page.getByRole('button', { name: 'Excel & Templates' }).click();
-    await expect(page.getByText(/spreadsheet/i).first()).toBeVisible();
-
     await page.getByRole('button', { name: 'Export Reports' }).click();
-    await expect(page.getByText(/export/i).first()).toBeVisible();
+    await expect(page.getByLabel('From date')).toBeVisible();
+    await expect(page.getByLabel('To date')).toBeVisible();
+    await expect(page.getByLabel('Filter by Type')).toBeVisible();
+  });
+
+  test('exports transactions across multiple months and excludes rows outside the range', async ({ page }) => {
+    const includedDescriptions = [`PW Range Start ${Date.now()}`, `PW Range End ${Date.now()}`];
+    const outsideDescription = `PW Range Outside ${Date.now()}`;
+    const createdIds: string[] = [];
+    const fixtures = [
+      { date: '2099-12-01', description: includedDescriptions[0] },
+      { date: '2100-01-31', description: includedDescriptions[1] },
+      { date: '2099-11-30', description: outsideDescription },
+    ];
+
+    try {
+      for (const fixture of fixtures) {
+        const response = await page.request.post('/api/transactions', {
+          data: {
+            ...fixture,
+            amount: 10,
+            category_id: null,
+            account_id: null,
+            category_name: 'Range Test',
+            type: 'expense',
+            is_recurring: false,
+            notes: null,
+          },
+        });
+        expect(response.status()).toBe(201);
+        const row = (await response.json()) as { id: string };
+        createdIds.push(row.id);
+      }
+
+      await openView(page, 'settings', /^Categories$/);
+      await page.getByRole('button', { name: 'Export Reports' }).click();
+      await page.getByLabel('From date').fill('2099-12-01');
+      await page.getByLabel('To date').fill('2100-01-31');
+      await expect(page.getByText('Matching Records').locator('..')).toContainText('2');
+
+      const downloadPromise = page.waitForEvent('download');
+      await page.getByRole('button', { name: 'Export CSV' }).click();
+      const download = await downloadPromise;
+      expect(download.suggestedFilename()).toBe('walletwise_report_2099-12-01_to_2100-01-31.csv');
+      const exportedCsv = await readFile((await download.path())!, 'utf8');
+      for (const description of includedDescriptions) expect(exportedCsv).toContain(description);
+      expect(exportedCsv).not.toContain(outsideDescription);
+
+      await page.getByLabel('From date').fill('2100-02-01');
+      await expect(page.getByRole('alert')).toHaveText('The start date must be on or before the end date.');
+      await expect(page.getByRole('button', { name: 'Export CSV' })).toBeDisabled();
+    } finally {
+      await Promise.all(createdIds.map((id) => page.request.delete(`/api/transactions/${id}`)));
+    }
+  });
+
+  test('budget tab imports only budget rows from a mixed spreadsheet', async ({ page }) => {
+    const month = `${2200 + (Date.now() % 500)}-12`;
+    const excludedDescription = `PW Excluded Transaction ${Date.now()}`;
+    let category: { id: string; name: string } | undefined;
+    let importedBudgetId: string | undefined;
+
+    await openView(page, 'budgets', /Selected Period/);
+    await expect(page.getByLabel('Import budgets spreadsheet')).toBeVisible();
+    const categoriesResponse = await page.request.get('/api/categories');
+    const categories = (await categoriesResponse.json()) as { id: string; name: string; type: string }[];
+    category = categories.find((item) => item.type === 'expense');
+    expect(category).toBeTruthy();
+    await page.route('**/api/ai/parse-spreadsheet', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          transactions: [{
+            date: '2099-12-01',
+            amount: 18,
+            description: excludedDescription,
+            category: 'Excluded transaction category',
+            account: '',
+            type: 'expense',
+            is_recurring: false,
+          }],
+          budgets: [{ month, category: category!.name, planned_amount: 320 }],
+          warnings: [],
+          stats: { sheets: 1, rows: 2, chunks: 1, aiChunks: 1, fallbackChunks: 0, dropped: 0 },
+          source: 'ai',
+        }),
+      })
+    );
+
+    try {
+      await page.getByLabel('Import budgets spreadsheet').setInputFiles({
+        name: 'mixed-finance.csv',
+        mimeType: 'text/csv',
+        buffer: Buffer.from(`Month,Category,PlannedAmount\n${month},Test,320`),
+      });
+      await expect(page.getByRole('heading', { name: 'Review Import' })).toBeVisible({ timeout: 30_000 });
+      await expect(page.getByText(`${category!.name} budget`)).toBeVisible();
+      await expect(page.getByText(excludedDescription)).toHaveCount(0);
+
+      await page.getByRole('button', { name: 'Confirm Import' }).click();
+      await expect(page.getByText('Successfully imported 1 budgets.')).toBeVisible({ timeout: 20_000 });
+
+      const transactionsResponse = await page.request.get('/api/transactions');
+      const transactions = (await transactionsResponse.json()) as { description: string }[];
+      expect(transactions.some((transaction) => transaction.description === excludedDescription)).toBe(false);
+
+      const budgetsResponse = await page.request.get('/api/budgets');
+      const budgets = (await budgetsResponse.json()) as { id: string; month: string; category_id: string }[];
+      importedBudgetId = budgets.find((budget) => budget.month === month && budget.category_id === category!.id)?.id;
+      expect(importedBudgetId).toBeTruthy();
+    } finally {
+      if (!importedBudgetId) {
+        const budgetsResponse = await page.request.get('/api/budgets');
+        const budgets = (await budgetsResponse.json()) as { id: string; month: string; category_id: string }[];
+        importedBudgetId = budgets.find((budget) => budget.month === month && budget.category_id === category?.id)?.id;
+      }
+      if (importedBudgetId) await page.request.delete(`/api/budgets/${importedBudgetId}`);
+    }
   });
 
   test('account deletion is read-only during recovery and can be restored', async ({ page }) => {
@@ -260,8 +376,8 @@ test.describe('authenticated app', () => {
     await page.getByRole('button', { name: 'Create Account' }).click();
     await expect(page.getByText(accountName).first()).toBeVisible({ timeout: 20_000 });
 
-    await openView(page, 'settings', /^Categories$/);
-    await page.getByRole('button', { name: 'Excel & Templates' }).click();
+    await openView(page, 'transactions', /Filtered Income/);
+    await expect(page.getByLabel('Import transactions spreadsheet')).toBeVisible();
     const csv = [
       'Date,Description,Category,Type,Amount,Recurring,Account,Notes',
       `2026-10-03,${description},Groceries,expense,${amount},false,${accountName},`,
@@ -269,7 +385,7 @@ test.describe('authenticated app', () => {
     const parseResponsePromise = page.waitForResponse(
       (response) => new URL(response.url()).pathname === '/api/ai/parse-spreadsheet'
     );
-    await page.locator('input[type="file"]').first().setInputFiles({
+    await page.getByLabel('Import transactions spreadsheet').setInputFiles({
       name: 'account-transactions.csv',
       mimeType: 'text/csv',
       buffer: Buffer.from(csv),

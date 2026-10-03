@@ -1,25 +1,14 @@
 import React, { useState } from 'react'
 import {
-  Tag,
-  UploadCloud,
-  FileSpreadsheet,
   Download,
   Plus,
   Trash2,
   Edit2,
-  CheckCircle2,
-  AlertCircle,
-  FileText,
   X,
   FileJson,
-  Sparkles,
 } from 'lucide-react'
-import * as XLSX from 'xlsx'
 import { useFinance } from '@/context/FinanceContext'
 import { formatCurrency, getCurrentMonth } from '@/lib/utils'
-import { apiFetch, describeApiError } from '@/lib/api'
-import { validateFileForKind } from '@/lib/storagePolicy'
-import { normalizeSheets, type RawBudget, type RawTransaction } from '@/lib/importParser'
 import {
   useCategories,
   useAddCategory,
@@ -30,14 +19,7 @@ import { useTransactions } from '@/hooks/useTransactions'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useCurrency, useUser } from '@/hooks/useUser'
 import { useScheduleAccountDeletion } from '@/hooks/useAccountDeletion'
-import {
-  useBulkImport,
-  type ImportPayload,
-  type ImportPreview,
-  type DuplicateDecision,
-} from '@/hooks/useBulkImport'
-import { ImportReviewModal } from './ImportReviewModal'
-import type { Account, Category, TransactionType } from '@/types'
+import type { Category, TransactionType } from '@/types'
 
 const PRESET_CATEGORY_COLORS = [
   '#10b981',
@@ -52,40 +34,18 @@ const PRESET_CATEGORY_COLORS = [
   '#64748b',
 ]
 
-/** Response contract of `POST /api/ai/parse-spreadsheet` (Phase 6.6). */
-interface AiParseResponse {
-  transactions: RawTransaction[]
-  budgets: RawBudget[]
-  warnings: string[]
-  stats: {
-    sheets: number
-    rows: number
-    chunks: number
-    aiChunks: number
-    fallbackChunks: number
-    dropped: number
-  }
-  source: 'ai' | 'fallback' | 'mixed'
-}
-
-interface ImportSheet {
-  name: string
-  rows: Record<string, unknown>[]
-}
-
 export const SettingsView: React.FC = () => {
   const { addToast } = useFinance()
   const currency = useCurrency()
   const { data: categories = [] } = useCategories()
   const { data: transactions = [] } = useTransactions()
-  const { data: accounts = [], isPending: isAccountsPending } = useAccounts()
+  const { data: accounts = [] } = useAccounts()
   const { mutate: createCategory } = useAddCategory()
   const { mutate: saveCategory, isPending: isSavingCategory } = useUpdateCategory()
   const { mutate: removeCategory } = useDeleteCategory()
-  const { previewImportAsync, commitImport, isCommitting: isCommittingImport } = useBulkImport()
 
   // Tab
-  const [activeSettingsTab, setActiveSettingsTab] = useState<'categories' | 'import' | 'reports' | 'account'>('categories')
+  const [activeSettingsTab, setActiveSettingsTab] = useState<'categories' | 'reports' | 'account'>('categories')
   const [deletionConfirmation, setDeletionConfirmation] = useState('')
   const { data: user } = useUser()
   const { mutate: scheduleDeletion, isPending: isSchedulingDeletion } = useScheduleAccountDeletion()
@@ -106,16 +66,14 @@ export const SettingsView: React.FC = () => {
   })
 
   // Reports Filter & State
-  const [reportMonth, setReportMonth] = useState<string>(getCurrentMonth())
+  const currentReportMonth = getCurrentMonth()
+  const [reportStartDate, setReportStartDate] = useState(`${currentReportMonth}-01`)
+  const [reportEndDate, setReportEndDate] = useState(() => {
+    const [year, month] = currentReportMonth.split('-').map(Number)
+    const lastDay = new Date(year, month, 0).getDate()
+    return `${currentReportMonth}-${String(lastDay).padStart(2, '0')}`
+  })
   const [reportType, setReportType] = useState<'all' | TransactionType>('all')
-
-  // Excel Import State
-  const [isImporting, setIsImporting] = useState(false)
-  const [importStatus, setImportStatus] = useState<string | null>(null)
-  const [importProgress, setImportProgress] = useState<{ transactionsCount: number; budgetsCount: number } | null>(null)
-  // Rows awaiting review + the server's classification of them.
-  const [pendingImport, setPendingImport] = useState<ImportPayload | null>(null)
-  const [importPreview, setImportPreview] = useState<ImportPreview | null>(null)
 
   // Handlers for Categories
   const openEditCategory = (cat: Category) => {
@@ -198,311 +156,19 @@ export const SettingsView: React.FC = () => {
     })
   }
 
-  // Excel File Upload → R2 archive → Workers AI normalization (Phase 6.6)
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    e.target.value = ''
-
-    if (isAccountsPending) {
-      addToast('Accounts are loading', 'Wait for your accounts to load, then retry the import.', 'info')
-      return
-    }
-
-    const invalid = validateFileForKind('import', file)
-    if (invalid) {
-      addToast('Invalid file', invalid, 'error')
-      return
-    }
-
-    setIsImporting(true)
-    setImportStatus('Reading spreadsheet sheets...')
-
-    try {
-      // 1. Read the workbook client-side (SheetJS) into plain row objects.
-      const data = await file.arrayBuffer()
-      const workbook = XLSX.read(data, { type: 'array' })
-      const sheets: ImportSheet[] = workbook.SheetNames.map((sheetName) => {
-        const worksheet = workbook.Sheets[sheetName]
-        const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(worksheet, { defval: '' })
-        return { name: sheetName, rows }
-      })
-
-      // 2. Archive the original file in private R2 storage (best-effort —
-      //    the import must still succeed when storage is not configured).
-      setImportStatus('Archiving original file to secure storage...')
-      try {
-        const archived = await apiFetch<{ uploadUrl: string; key: string; contentType: string }>(
-          '/storage/upload-url',
-          {
-            method: 'POST',
-            body: JSON.stringify({
-              kind: 'import',
-              fileName: file.name,
-              contentType: file.type,
-              contentLength: file.size,
-            }),
-          }
-        )
-        const put = await fetch(archived.uploadUrl, {
-          method: 'PUT',
-          headers: { 'Content-Type': archived.contentType },
-          body: file,
-        })
-        if (!put.ok) throw new Error(`Storage responded with status ${put.status}`)
-      } catch {
-        addToast(
-          'Archive skipped',
-          'The original spreadsheet could not be archived; parsing continues.',
-          'info'
-        )
-      }
-
-      // 3. Normalize records — Workers AI endpoint with a local deterministic
-      //    fallback when the API is unreachable (e.g. plain `npm run dev`).
-      setImportStatus('Normalizing records with Workers AI...')
-      const today = new Date().toISOString().split('T')[0]
-      let result: AiParseResponse
-      try {
-        result = await apiFetch<AiParseResponse>('/ai/parse-spreadsheet', {
-          method: 'POST',
-          body: JSON.stringify({
-            fileName: file.name,
-            defaultDate: today,
-            defaultMonth: today.slice(0, 7),
-            sheets,
-          }),
-        })
-      } catch {
-        addToast(
-          'AI parsing unavailable',
-          'Using standard column matching to normalize your spreadsheet.',
-          'info'
-        )
-        const fallback = normalizeSheets(sheets, {
-          defaultDate: today,
-          defaultMonth: today.slice(0, 7),
-        })
-        result = { ...fallback, source: 'fallback', stats: { sheets: sheets.length, rows: 0, chunks: 0, aiChunks: 0, fallbackChunks: 1, dropped: 0 } }
-      }
-
-      // 4. Resolve categories by name (create missing ones once).
-      setImportStatus('Matching categories...')
-
-      // Categories are matched by name. Any category the sheet references but the
-      // account does not have must exist in D1 *before* the import rows are
-      // built — `transactions.category_id` is a real foreign key, so a
-      // placeholder id here would fail the insert. Create them all first, then
-      // map rows onto the returned ids.
-      const desired = new Map<string, TransactionType>()
-      for (const t of result.transactions) {
-        const key = t.category.trim().toLowerCase()
-        if (!desired.has(key)) desired.set(key, t.type)
-      }
-      for (const b of result.budgets) {
-        const key = b.category.trim().toLowerCase()
-        if (!desired.has(key)) desired.set(key, 'expense')
-      }
-
-      const resolved = new Map<string, Category>()
-      const missing: { name: string; type: TransactionType }[] = []
-
-      for (const [key, type] of desired) {
-        const existing = categories.find((c) => c.name.toLowerCase() === key)
-        if (existing) resolved.set(key, existing)
-        else missing.push({ name: key || 'general', type })
-      }
-
-      await Promise.all(
-        missing.map(({ name, type }) =>
-          new Promise<void>((resolve) => {
-            createCategory(
-              {
-                name: name.charAt(0).toUpperCase() + name.slice(1),
-                type,
-                color: PRESET_CATEGORY_COLORS[resolved.size % PRESET_CATEGORY_COLORS.length],
-                icon: 'Tag',
-              },
-              {
-                onSuccess: (created) => {
-                  resolved.set(name, created)
-                  resolve()
-                },
-                onError: (err: unknown) => {
-                  addToast(
-                    'Category not created',
-                    `"${name}" could not be created (${
-                      err instanceof Error ? err.message : 'unknown error'
-                    }); its rows will be imported without a category link.`,
-                    'warning'
-                  )
-                  resolve()
-                },
-              }
-            )
-          })
-        )
-      )
-
-      const lookupCategory = (name: string): Category | null => {
-        const key = (name.trim() || 'general').toLowerCase()
-        return resolved.get(key) ?? categories.find((c) => c.name.toLowerCase() === key) ?? null
-      }
-
-      const accountsByName = new Map<string, Account[]>()
-      for (const account of accounts) {
-        const key = account.name.trim().toLowerCase()
-        accountsByName.set(key, [...(accountsByName.get(key) ?? []), account])
-      }
-      const unmatchedAccountNames = new Set<string>()
-      const extractedTransactions = result.transactions.map((t) => {
-        const cat = lookupCategory(t.category)
-        const accountName = t.account.trim()
-        const matchingAccounts = accountName ? accountsByName.get(accountName.toLowerCase()) ?? [] : []
-        if (accountName && matchingAccounts.length !== 1) unmatchedAccountNames.add(accountName)
-        return {
-          date: t.date,
-          amount: t.amount,
-          description: t.description,
-          category_id: cat?.id ?? '',
-          account_id: matchingAccounts.length === 1 ? matchingAccounts[0].id : null,
-          category_name: cat?.name ?? (t.category || 'General'),
-          type: t.type,
-          is_recurring: t.is_recurring,
-          notes: `Imported from ${file.name}`,
-        }
-      })
-
-      if (unmatchedAccountNames.size > 0) {
-        addToast(
-          'Some accounts were not linked',
-          `${unmatchedAccountNames.size} account name${unmatchedAccountNames.size === 1 ? '' : 's'} did not uniquely match an existing account. Those transactions will be imported unlinked.`,
-          'warning'
-        )
-      }
-
-      const extractedBudgets = result.budgets.map((b) => {
-        const cat = lookupCategory(b.category)
-        return {
-          month: b.month,
-          category_id: cat?.id ?? '',
-          category_name: cat?.name ?? (b.category || 'General'),
-          planned_amount: b.planned_amount,
-          notes: `Imported from ${file.name}`,
-        }
-      })
-
-      if (result.warnings.length > 0) {
-        addToast(
-          'Import notes',
-          result.warnings.slice(0, 2).join(' '),
-          result.source === 'ai' ? 'info' : 'warning'
-        )
-      }
-
-      if (extractedTransactions.length > 0 || extractedBudgets.length > 0) {
-        setImportStatus('Checking for duplicates...')
-        const payload: ImportPayload = {
-          transactions: extractedTransactions,
-          budgets: extractedBudgets,
-        }
-        const preview = await previewImportAsync(payload)
-        setPendingImport(payload)
-        setImportPreview(preview)
-      } else {
-        addToast('No records found', 'The spreadsheet did not contain recognized columns.', 'info')
-      }
-    } catch (err: unknown) {
-      addToast(
-        'Import error',
-        describeApiError(err, 'The spreadsheet could not be prepared. Check the file and try again.'),
-        'error'
-      )
-    } finally {
-      setIsImporting(false)
-      setImportStatus(null)
-    }
-  }
-
-  const handleConfirmImport = (decisions: Record<string, DuplicateDecision>) => {
-    if (!pendingImport) return
-    commitImport(
-      { ...pendingImport, decisions },
-      {
-        onSuccess: (result) => {
-          const importedTx = result.inserted.transactions
-          const importedBg = result.inserted.budgets
-          const replaced = result.replaced.transactions + result.replaced.budgets
-
-          setImportProgress({ transactionsCount: importedTx, budgetsCount: importedBg })
-          addToast(
-            'Import completed',
-            `Imported ${importedTx} transactions and ${importedBg} budgets${
-              replaced > 0 ? `, replaced ${replaced} existing` : ''
-            }.`,
-            'success'
-          )
-          if (result.invalid.length > 0) {
-            addToast(
-              'Rows skipped',
-              `${result.invalid.length} invalid row${
-                result.invalid.length === 1 ? '' : 's'
-              } could not be imported.`,
-              'warning'
-            )
-          }
-          setPendingImport(null)
-          setImportPreview(null)
-        },
-        onError: (err: unknown) =>
-          addToast(
-            'Import failed',
-            describeApiError(
-              err,
-              'Your review is still open. Check Transactions before retrying if you are unsure whether any rows were saved.'
-            ),
-            'error'
-          ),
-      }
-    )
-  }
-
-  const cancelImport = () => {
-    setPendingImport(null)
-    setImportPreview(null)
-  }
-
-  // Download CSV Template
-  const downloadTemplate = (type: 'transactions' | 'budgets') => {
-    let csv = ''
-    let filename = ''
-    if (type === 'transactions') {
-      csv = 'Date,Description,Category,Type,Amount,Recurring,Account,Notes\n2026-10-01,Monthly Rent,Rent & Housing,expense,850.00,true,Daily Checking,Apartment lease\n2026-10-02,Client Payment,Freelance & Business,income,1200.00,false,,Design project\n'
-      filename = 'walletwise_transactions_template.csv'
-    } else {
-      csv = 'Month,Category,PlannedAmount,Notes\n2026-10,Groceries & Food,500.00,Food budget cap\n2026-10,Utilities & Internet,150.00,Power and fiber\n'
-      filename = 'walletwise_budgets_template.csv'
-    }
-
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.setAttribute('download', filename)
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    addToast('Template downloaded', `Saved ${filename}`, 'success')
-  }
-
   // Export Report as CSV or JSON
+  const isReportRangeInvalid = !reportStartDate || !reportEndDate || reportStartDate > reportEndDate
   const filteredReport = transactions.filter((t) => {
-    const matchMonth = !reportMonth || t.date.startsWith(reportMonth)
+    const matchDate = t.date >= reportStartDate && t.date <= reportEndDate
     const matchType = reportType === 'all' || t.type === reportType
-    return matchMonth && matchType
+    return matchDate && matchType
   })
 
   const exportReport = (format: 'csv' | 'json') => {
+    if (isReportRangeInvalid) {
+      addToast('Invalid date range', 'The start date must be on or before the end date.', 'error')
+      return
+    }
     if (filteredReport.length === 0) {
       addToast('No data', 'There are no records to export for this filter.', 'info')
       return
@@ -513,7 +179,7 @@ export const SettingsView: React.FC = () => {
       const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
-      link.download = `walletwise_report_${reportMonth || 'all'}.json`
+      link.download = `walletwise_report_${reportStartDate}_to_${reportEndDate}.json`
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
@@ -541,7 +207,7 @@ export const SettingsView: React.FC = () => {
       const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
-      link.download = `walletwise_report_${reportMonth || 'all'}.csv`
+      link.download = `walletwise_report_${reportStartDate}_to_${reportEndDate}.csv`
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
@@ -578,16 +244,6 @@ export const SettingsView: React.FC = () => {
           }`}
         >
           Categories
-        </button>
-        <button
-          onClick={() => setActiveSettingsTab('import')}
-          className={`px-4 py-2 text-xs font-semibold rounded-xl transition-all ${
-            activeSettingsTab === 'import'
-              ? 'bg-surface text-platinum shadow-card'
-              : 'text-muted hover:text-platinum text-muted'
-          }`}
-        >
-          Excel & Templates
         </button>
         <button
           onClick={() => setActiveSettingsTab('reports')}
@@ -720,110 +376,7 @@ export const SettingsView: React.FC = () => {
         </div>
       )}
 
-      {/* 2. Excel & CSV Import */}
-      {activeSettingsTab === 'import' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* File Dropzone */}
-          <div className="bg-surface p-6 rounded-2xl border border-hairline shadow-card space-y-4">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-indigo" />
-              <h3 className="text-base font-bold text-platinum">
-                AI Excel & CSV Spreadsheet Import
-              </h3>
-            </div>
-            <p className="text-xs text-muted">
-              Upload bank statements, budgeting sheets, or expense exports (.xlsx, .xls, .csv).
-              The engine automatically normalizes columns, categorizes records, and batch inserts
-              data scoped to your account.
-            </p>
-
-            <div className="border-2 border-dashed border-hairline rounded-2xl p-8 text-center hover:border-indigo transition-colors relative cursor-pointer group bg-surface-3/50">
-              <input
-                type="file"
-                accept=".xlsx,.xls,.csv"
-                onChange={handleFileUpload}
-                disabled={isImporting}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-              />
-              <UploadCloud className="w-10 h-10 text-indigo mx-auto mb-2 group-hover:scale-110 transition-transform" />
-              <p className="text-sm font-semibold text-platinum">
-                Click or drag Excel/CSV file here
-              </p>
-              <p className="text-xs text-muted mt-1">Supports multi-sheet workbooks up to 10MB</p>
-            </div>
-
-            {isImporting && (
-              <div className="p-4 rounded-xl bg-indigo/10 border border-indigo/40 text-xs text-platinum flex items-center gap-3">
-                <div className="w-4 h-4 border-2 border-indigo border-t-transparent rounded-full animate-spin" />
-                <span>{importStatus}</span>
-              </div>
-            )}
-
-            {importProgress && !isImporting && (
-              <div className="p-4 rounded-xl bg-success/10 border border-success/40 text-xs text-platinum flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-success" />
-                <span>
-                  Successfully imported {importProgress.transactionsCount} transactions and{' '}
-                  {importProgress.budgetsCount} budgets.
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* Download CSV Templates */}
-          <div className="bg-surface p-6 rounded-2xl border border-hairline shadow-card space-y-4">
-            <h3 className="text-base font-bold text-platinum">
-              Starter CSV Templates
-            </h3>
-            <p className="text-xs text-muted">
-              Need a standardized layout for manual data entry? Download pre-formatted CSV templates
-              ready for upload.
-            </p>
-
-            <div className="space-y-3 pt-2">
-              <div className="flex items-center justify-between p-3.5 rounded-xl border border-hairline bg-surface-3/40">
-                <div className="flex items-center gap-3">
-                  <FileSpreadsheet className="w-5 h-5 text-indigo" />
-                  <div>
-                    <p className="text-xs font-bold text-platinum">
-                      Transactions Template (.csv)
-                    </p>
-                    <p className="text-[11px] text-muted">Date, Description, Category, Type, Amount, Account</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => downloadTemplate('transactions')}
-                  className="p-2 rounded-xl text-indigo hover:bg-indigo/15 transition-colors"
-                  title="Download template"
-                >
-                  <Download className="w-4 h-4" />
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between p-3.5 rounded-xl border border-hairline bg-surface-3/40">
-                <div className="flex items-center gap-3">
-                  <FileSpreadsheet className="w-5 h-5 text-success" />
-                  <div>
-                    <p className="text-xs font-bold text-platinum">
-                      Budgets Template (.csv)
-                    </p>
-                    <p className="text-[11px] text-muted">Month, Category, PlannedAmount, Notes</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => downloadTemplate('budgets')}
-                  className="p-2 rounded-xl text-success hover:bg-success/10 transition-colors"
-                  title="Download template"
-                >
-                  <Download className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 3. Reports & Export */}
+      {/* Reports & Export */}
       {activeSettingsTab === 'reports' && (
         <div className="bg-surface p-6 rounded-2xl border border-hairline shadow-card space-y-6">
           <div>
@@ -831,30 +384,49 @@ export const SettingsView: React.FC = () => {
               Financial Reports & Data Export
             </h3>
             <p className="text-xs text-muted">
-              Filter records by month or type, preview totals, and download in CSV or JSON format.
+              Filter transactions by date range and type, preview totals, and download in CSV or JSON format.
             </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-muted mb-1">
-                Filter by Month
+              <label htmlFor="report-start-date" className="block text-xs font-medium text-muted mb-1">
+                From date
               </label>
               <input
-                type="month"
-                value={reportMonth}
-                onChange={(e) => setReportMonth(e.target.value)}
+                id="report-start-date"
+                type="date"
+                required
+                max={reportEndDate}
+                value={reportStartDate}
+                onChange={(e) => setReportStartDate(e.target.value)}
                 className="w-full px-3 py-2 text-sm rounded-xl bg-surface-3 border border-hairline text-platinum"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-muted mb-1">
+              <label htmlFor="report-end-date" className="block text-xs font-medium text-muted mb-1">
+                To date
+              </label>
+              <input
+                id="report-end-date"
+                type="date"
+                required
+                min={reportStartDate}
+                value={reportEndDate}
+                onChange={(e) => setReportEndDate(e.target.value)}
+                className="w-full px-3 py-2 text-sm rounded-xl bg-surface-3 border border-hairline text-platinum"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="report-type" className="block text-xs font-medium text-muted mb-1">
                 Filter by Type
               </label>
               <select
+                id="report-type"
                 value={reportType}
-                onChange={(e) => setReportType(e.target.value as any)}
+                onChange={(e) => setReportType(e.target.value as TransactionType | 'all')}
                 className="w-full px-3 py-2 text-sm rounded-xl bg-surface-3 border border-hairline text-platinum"
               >
                 <option value="all">All Types</option>
@@ -863,6 +435,14 @@ export const SettingsView: React.FC = () => {
               </select>
             </div>
           </div>
+
+          {isReportRangeInvalid && (
+            <p className="text-xs text-danger" role="alert">
+              {!reportStartDate || !reportEndDate
+                ? 'Both dates are required.'
+                : 'The start date must be on or before the end date.'}
+            </p>
+          )}
 
           {/* Report Preview */}
           <div className="p-4 rounded-2xl bg-surface-3/50 border border-hairline flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -884,14 +464,16 @@ export const SettingsView: React.FC = () => {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => exportReport('csv')}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gold hover:bg-gold-hover text-ink shadow-gold text-xs font-semibold transition-all"
+                disabled={isReportRangeInvalid}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gold hover:bg-gold-hover text-ink shadow-gold text-xs font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>Export CSV</span>
               </button>
               <button
                 onClick={() => exportReport('json')}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-surface-3 hover:bg-hairline text-platinum text-xs font-semibold transition-all"
+                disabled={isReportRangeInvalid}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-surface-3 hover:bg-hairline text-platinum text-xs font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <FileJson className="w-3.5 h-3.5" />
                 <span>Export JSON</span>
@@ -1002,16 +584,6 @@ export const SettingsView: React.FC = () => {
         </div>
       )}
 
-      {/* Import review — the only place rows reach D1 */}
-      {pendingImport && importPreview && (
-        <ImportReviewModal
-          preview={importPreview}
-          accountNames={Object.fromEntries(accounts.map((account) => [account.id, account.name]))}
-          isCommitting={isCommittingImport}
-          onCancel={cancelImport}
-          onConfirm={handleConfirmImport}
-        />
-      )}
     </div>
   )
 }

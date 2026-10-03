@@ -27,6 +27,7 @@ import {
 import { useCategories } from '@/hooks/useCategories'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useCurrency } from '@/hooks/useUser'
+import { SpreadsheetImport } from '@/components/import/SpreadsheetImport'
 import type { Transaction, TransactionType } from '@/types'
 
 interface TransactionsViewProps {
@@ -360,6 +361,8 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
           </p>
         </div>
       </div>
+
+      <SpreadsheetImport kind="transactions" />
 
       {/* Filter Controls */}
       <div className="bg-surface rounded-2xl p-4 border border-hairline shadow-card space-y-3">

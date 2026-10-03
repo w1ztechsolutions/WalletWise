@@ -65,18 +65,24 @@ A sheet named `*budget*` produces budgets; everything else produces transactions
 
 `source`: `ai` | `fallback` | `mixed`.
 
-## Client integration (`SettingsView`)
+## Client integration (`SpreadsheetImport`)
 
 1. SheetJS reads the workbook into row objects (kept client-side; the raw file
    is also archived to R2 via `POST /storage/upload-url`, best-effort).
-2. Rows are posted here; `category` **names** returned by the server are
-   matched against the user's categories (missing ones are created once via a
-   local cache) and turned into `category_id`s. Optional account names are
-   matched case-insensitively to a unique existing account; missing, unknown,
-   or ambiguous names remain unlinked. Account IDs are validated again by
-   `POST /api/import` against the authenticated user.
-3. Records are committed through `batchImport()`.
-4. If this endpoint is unreachable (e.g. plain `npm run dev` without Pages
+2. The parser can return transactions and budgets from one workbook. The
+   Transactions tab keeps only transaction rows; the Budgets tab keeps only
+   budget rows. Other entity rows are excluded before category resolution and
+   the user is notified, so an import cannot create categories or records for
+   the other tab's entity type.
+3. Selected rows' `category` **names** are matched against the user's
+   categories (missing ones are created once) and turned into `category_id`s.
+   Optional transaction account names are matched case-insensitively to a
+   unique existing account; missing, unknown, or ambiguous names remain
+   unlinked. Account IDs are validated again by `POST /api/import` against the
+   authenticated user.
+4. Records are shown in the duplicate review and committed through
+   `POST /api/import`.
+5. If this endpoint is unreachable (e.g. plain `npm run dev` without Pages
    Functions), the client calls `normalizeSheets()` directly — same engine as
    the server fallback, so results are consistent.
 

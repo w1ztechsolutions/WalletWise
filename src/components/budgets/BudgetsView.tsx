@@ -16,6 +16,7 @@ import { useCategories } from '@/hooks/useCategories'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useCurrency } from '@/hooks/useUser'
 import { useFinance } from '@/context/FinanceContext'
+import { SpreadsheetImport } from '@/components/import/SpreadsheetImport'
 import type { Budget } from '@/types'
 
 export const BudgetsView: React.FC = () => {
@@ -234,6 +235,8 @@ export const BudgetsView: React.FC = () => {
           <span>Set Budget</span>
         </button>
       </div>
+
+      <SpreadsheetImport kind="budgets" />
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">

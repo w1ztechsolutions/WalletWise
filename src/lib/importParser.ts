@@ -7,7 +7,7 @@ import type { TransactionType } from '@/types'
  *  1. Server — as the per-chunk fallback inside `POST /api/ai/parse-spreadsheet`
  *     when Workers AI is unavailable or returns unparseable output, so imports
  *     never hard-fail.
- *  2. Client — in `SettingsView` when the AI endpoint itself is unreachable
+ *  2. Client — in `SpreadsheetImport` when the AI endpoint itself is unreachable
  *     (offline dev against Vite, session expired, etc.).
  *
  * DOM-free on purpose so Pages Functions can bundle it.

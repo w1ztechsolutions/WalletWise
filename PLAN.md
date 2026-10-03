@@ -159,6 +159,7 @@ All records automatically include `id`, `created_date`, `updated_date`, and `cre
   - Search + filters (type, category, month).
   - Grouped by date with color-coded badges, signed amounts, and hover edit/delete.
   - Add/Edit transaction dialog with positive amount validation.
+  - Spreadsheet import scoped to transactions, with duplicate review and a matching CSV template.
 - [x] **Accounts (`/accounts`):**
   - Net worth header with sub-totals (cash, bank, mobile wallet).
   - Tab filters + account cards with masked numbers and institution presets.
@@ -167,14 +168,14 @@ All records automatically include `id`, `created_date`, `updated_date`, and `cre
   - Month navigation picker (prev/next).
   - Planned vs Actual summary cards and category progress bars.
   - Add/Edit budget dialog with duplicate prevention.
+  - Spreadsheet import scoped to budgets, with duplicate review and a matching CSV template.
 - [x] **Analytics (`/analytics`):**
   - All-time statistics (total income, expenses, net balance, savings rate).
   - Monthly income vs expenses trend charts.
   - Spending by category pie chart + top spending categories ranking.
 - [x] **Settings (`/settings`):**
   - Category manager (income/expense categories with color dots & delete guard).
-  - CSV templates download and export reports (CSV / JSON).
-  - Excel file upload + spreadsheet parser & normalizer dialog.
+  - Transaction export reports (CSV / JSON) with inclusive date-range and type filters.
 
 ### Phase 5: Testing, Local Verification & Deployment
 - [x] Build validation (`npm run build` passes with zero errors).
@@ -240,6 +241,7 @@ All records automatically include `id`, `created_date`, `updated_date`, and `cre
 - [x] Write `e2e/auth.spec.ts` — client-side validation, sign-in/sign-up toggle, rejected credentials, and the full sign-in → reload → sign-out round trip.
 - [x] Write `e2e/navigation.spec.ts` — hash deep links and all six tabs driven through the real chrome at **both** breakpoints (drawer vs fixed bottom bar, per `AGENT.md` §3.3).
 - [x] Write `e2e/app.spec.ts` — dashboard, accounts, transactions, budgets, settings, analytics, plus create/delete CRUD that cleans up after itself. Credential-gated via `E2E_EMAIL` / `E2E_PASSWORD` so it never writes to D1 unauthenticated.
+- [ ] Verify tab-scoped mixed-workbook import and cross-month CSV export with range exclusion, range-based filenames, and reversed-date validation (credential-gated; run with `E2E_EMAIL` / `E2E_PASSWORD`).
 - [x] **Fix `BUG-009`** — `AuthView` never surfaced credential failures because Better Auth's client resolves with `{ data, error }` instead of rejecting; `Sidebar.handleSignOut` likewise reported success unconditionally.
 - [x] **Fix `BUG-010`** — modal dialogs had no height cap or overflow, making the transaction form's submit button physically unreachable on a phone. Added `max-h-[90vh] overflow-y-auto` to all four dialog cards.
 - [x] **Fix `BUG-011`** — sign-out left the authenticated shell mounted with a stale session, because `queryClient.clear()` destroys the Query instance `useSession` observes. Now invalidates the session in place and removes the remaining queries by predicate (same fix applied to `AuthGate`'s 401 teardown).
