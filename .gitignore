@@ -28,6 +28,13 @@ d1-local.sqlite*
 *.sqlite-shm
 *.sqlite-wal
 
+# Playwright (e2e)
+test-results
+playwright-report
+blob-report
+.playwright-cache
+.playwright-mcp
+
 # Local smoke-test / build scratch output
 .smoke-cookies.txt
 .build-out.txt

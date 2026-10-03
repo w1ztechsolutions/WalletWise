@@ -70,17 +70,24 @@ export const AuthView: React.FC = () => {
 
     setIsPending(true);
     try {
+      // Better Auth's client **resolves** with `{ data, error }` on a failed
+      // request instead of rejecting, so a `catch`-only handler never fires and
+      // every credential failure would look like a no-op click. Each result is
+      // therefore checked and its error promoted to a throw, keeping this
+      // `catch` the single place that turns a failure into visible text.
       if (isSignUp) {
-        await authClient.signUp.email({
+        const res = await authClient.signUp.email({
           name: name.trim(),
           email: email.trim(),
           password,
         });
+        if (res.error) throw res.error;
       } else {
-        await authClient.signIn.email({
+        const res = await authClient.signIn.email({
           email: email.trim(),
           password,
         });
+        if (res.error) throw res.error;
       }
       // The session cookie now exists, but `useSession` is a plain React Query
       // read — it has no subscription to the auth client, so it must be

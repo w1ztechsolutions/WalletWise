@@ -234,3 +234,15 @@ All records automatically include `id`, `created_date`, `updated_date`, and `cre
 - [x] `ENVIRONMENT` var: `"production"` default in `wrangler.jsonc`, overridden to `"development"` by `.dev.vars` (documented in `.dev.vars.example`).
 - [x] Verified: `npm run build` green; `wrangler pages dev` boots; signed-out `GET /api/transactions` returns `401 {"error":"Unauthorized","code":"UNAUTHORIZED"}`. WIP build-breakage documented in `BUG-007`.
 
+#### Phase 9: End-to-End Test Suite and Production Audit
+- [x] Add `@playwright/test` with `playwright.config.ts` targeting the **deployed** Pages URL by default (`E2E_BASE_URL` overrides it), running `desktop` + `mobile` projects. Rationale and trade-offs in `ADR-004`; `tsconfig.e2e.json` keeps the specs typed without joining the shipped browser bundle.
+- [x] Write `e2e/smoke.spec.ts` — document metadata, bundle 404s, the anonymous `/api/*` `401` envelope, and no stack-trace leakage in production errors.
+- [x] Write `e2e/auth.spec.ts` — client-side validation, sign-in/sign-up toggle, rejected credentials, and the full sign-in → reload → sign-out round trip.
+- [x] Write `e2e/navigation.spec.ts` — hash deep links and all six tabs driven through the real chrome at **both** breakpoints (drawer vs fixed bottom bar, per `AGENT.md` §3.3).
+- [x] Write `e2e/app.spec.ts` — dashboard, accounts, transactions, budgets, settings, analytics, plus create/delete CRUD that cleans up after itself. Credential-gated via `E2E_EMAIL` / `E2E_PASSWORD` so it never writes to D1 unauthenticated.
+- [x] **Fix `BUG-009`** — `AuthView` never surfaced credential failures because Better Auth's client resolves with `{ data, error }` instead of rejecting; `Sidebar.handleSignOut` likewise reported success unconditionally.
+- [x] **Fix `BUG-010`** — modal dialogs had no height cap or overflow, making the transaction form's submit button physically unreachable on a phone. Added `max-h-[90vh] overflow-y-auto` to all four dialog cards.
+- [x] **Fix `BUG-011`** — sign-out left the authenticated shell mounted with a stale session, because `queryClient.clear()` destroys the Query instance `useSession` observes. Now invalidates the session in place and removes the remaining queries by predicate (same fix applied to `AuthGate`'s 401 teardown).
+- [x] Verified: `npx tsc -b` clean, `npm run lint` 0 errors, and **52/52 Playwright specs passing** across `desktop` and `mobile` against `wrangler pages dev`.
+- [ ] **Redeploy production (`BUG-008` — still open).** The live deployment is three commits stale and its D1 `database_id` is still the `local-walletwise-db` placeholder, so sign-up and sign-in return `500` for every visitor. The corrected `wrangler.jsonc` is already on `main`; this needs `npm run build && npx wrangler pages deploy dist --project-name walletwise --branch main`, then a `npm run test:e2e` run against the live URL to confirm.
+

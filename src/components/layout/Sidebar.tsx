@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { useFinance } from '@/context/FinanceContext'
 import { authClient } from '@/lib/auth-client'
+import { sessionKeys } from '@/hooks/useSession'
 
 export type NavTab = 'dashboard' | 'transactions' | 'accounts' | 'budgets' | 'analytics' | 'settings'
 
@@ -36,10 +37,31 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, activeTab, on
   const queryClient = useQueryClient()
 
   const handleSignOut = async () => {
-    // Order matters: drop the cache before the cookie so no cached row can be
-    // rendered against the signed-out shell, then confirm with the server.
-    queryClient.clear()
-    await authClient.signOut()
+    // Better Auth's client resolves with `{ data, error }` rather than
+    // rejecting, so a failure here would otherwise be reported as a successful
+    // sign-out.
+    const res = await authClient.signOut()
+    if (res.error) {
+      addToast('Sign out failed', res.error.message ?? 'Please try again.', 'error')
+      return
+    }
+    // Invalidate the session **in place**. `queryClient.clear()` cannot be used
+    // here: it destroys the Query object that the mounted `useSession` observer
+    // is still subscribed to, so the observer keeps serving the pre-sign-out
+    // session and `AuthGate` never swaps in the auth screen. Invalidating
+    // refetches the same instance, which is what actually tears the shell down.
+    //
+    // Signing out first (rather than clearing first) also matters: clearing
+    // first mounted a `get-session` refetch that raced this request and could
+    // cache the still-valid cookie.
+    await queryClient.invalidateQueries({ queryKey: sessionKeys.all })
+
+    // Everything else is dead now. Drop it so no row scoped to this session can
+    // ever render for whoever authenticates next (SECURITY.md §2).
+    queryClient.removeQueries({
+      predicate: (query) => query.queryKey[0] !== 'session',
+    })
+
     addToast('Signed out', 'Your session has been terminated.', 'info')
     onClose()
   }

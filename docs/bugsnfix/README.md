@@ -17,6 +17,19 @@ Each bug is documented in its own individual file following the naming pattern: 
 | BUG-005 | [BUG-005-dead-hooks-and-unwired-backend.md](./BUG-005-dead-hooks-and-unwired-backend.md) | High | ✅ Resolved | 2026-10-02 |
 | BUG-006 | [BUG-006-d1-binding-rename-regression.md](./BUG-006-d1-binding-rename-regression.md) | Critical | ✅ Resolved | 2026-10-02 |
 | BUG-007 | [BUG-007-error-contract-wip-build-break.md](./BUG-007-error-contract-wip-build-break.md) | High | ✅ Resolved | 2026-10-02 |
+| BUG-008 | [2026-10-02-stale-deployment-breaks-production-auth.md](./2026-10-02-stale-deployment-breaks-production-auth.md) | Critical | 🔴 Open — fix committed, redeploy required | 2026-10-02 |
+| BUG-009 | [2026-10-02-auth-failures-silently-swallowed.md](./2026-10-02-auth-failures-silently-swallowed.md) | High | ✅ Resolved | 2026-10-02 |
+| BUG-010 | [2026-10-02-modal-dialogs-overflow-mobile-viewport.md](./2026-10-02-modal-dialogs-overflow-mobile-viewport.md) | High | ✅ Resolved | 2026-10-02 |
+| BUG-011 | [2026-10-02-signout-leaves-app-shell-mounted.md](./2026-10-02-signout-leaves-app-shell-mounted.md) | High | ✅ Resolved | 2026-10-02 |
+
+> **BUG-006 is marked Resolved in the repository but was still live in
+> production.** The fix (`3871a7c`) was committed and never deployed; see
+> BUG-008. "Resolved" in this index means "fixed in source", not "fixed for
+> users" — verify with `npm run test:e2e` against the deployed URL.
+
+> **BUG-009 → BUG-011 were found by the Playwright suite introduced in
+> [ADR-004](../adr/004-playwright-e2e-suite-against-deployed-pages.md)**, not by
+> review. All three are regressions guarded by specs in `e2e/`.
 
 ---
 

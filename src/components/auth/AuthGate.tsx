@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { AuthView } from "./AuthView";
 import { authClient } from "@/lib/auth-client";
 import { UNAUTHORIZED_EVENT } from "@/lib/api";
-import { useSession } from "@/hooks/useSession";
+import { useSession, sessionKeys } from "@/hooks/useSession";
 
 /**
  * Single gate between the anonymous and authenticated worlds.
@@ -20,9 +20,15 @@ export const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) 
 
   useEffect(() => {
     const handleUnauthorized = () => {
-      // Clear first: cached rows are scoped to the session that just died and
-      // must never be visible to whoever authenticates next.
-      queryClient.clear();
+      // Same rule as `Sidebar.handleSignOut`: `queryClient.clear()` destroys the
+      // Query instance `useSession` is observing, so the gate would keep
+      // believing it is authenticated and the user would sit on an error-filled
+      // shell forever. Invalidate the session in place, then drop every other
+      // cached row.
+      void queryClient.invalidateQueries({ queryKey: sessionKeys.all });
+      queryClient.removeQueries({
+        predicate: (query) => query.queryKey[0] !== 'session',
+      });
       void authClient.signOut();
     };
 

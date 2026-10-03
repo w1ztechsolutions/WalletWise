@@ -382,7 +382,7 @@ export const BudgetsView: React.FC = () => {
       {/* Add / Edit Budget Dialog */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/80 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-surface rounded-2xl max-w-md w-full p-6 shadow-2xl border border-hairline">
+          <div className="bg-surface rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl border border-hairline">
             <div className="flex items-center justify-between pb-4 border-b border-hairline">
               <h3 className="text-base font-bold text-platinum">
                 {editingBudget ? 'Edit Budget' : `Set Budget for ${monthLabel}`}
