@@ -23,6 +23,7 @@ Each bug is documented in its own individual file following the naming pattern: 
 | BUG-011 | [2026-10-02-signout-leaves-app-shell-mounted.md](./2026-10-02-signout-leaves-app-shell-mounted.md) | High | ✅ Resolved | 2026-10-02 |
 | BUG-012 | [2026-10-03-production-d1-migration-pending.md](./2026-10-03-production-d1-migration-pending.md) | Critical | ✅ Resolved | 2026-10-03 |
 | BUG-013 | [2026-10-03-security-query-cache-and-delete-fix.md](./2026-10-03-security-query-cache-and-delete-fix.md) | High | ✅ Resolved | 2026-10-03 |
+| BUG-014 | [2026-10-03-vulnerable-spreadsheet-and-esbuild-dependencies.md](./2026-10-03-vulnerable-spreadsheet-and-esbuild-dependencies.md) | High | ✅ Resolved | 2026-10-03 |
 
 > **BUG-006 is marked Resolved in the repository but was still live in
 > production.** The fix (`3871a7c`) was committed and never deployed; see
