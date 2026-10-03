@@ -68,6 +68,8 @@ export interface User {
   email: string
   avatar_url?: string
   currency?: string
+  deletionRequestedAt?: string | null
+  deletionScheduledFor?: string | null
 }
 
 export interface MonthSummary {

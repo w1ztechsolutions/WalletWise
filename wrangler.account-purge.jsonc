@@ -1,0 +1,23 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "walletwise-account-purge",
+	"main": "workers/account-purge.ts",
+	"compatibility_date": "2024-11-01",
+	"compatibility_flags": ["nodejs_compat"],
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "walletwise-db",
+			"database_id": "e9d133d0-fe79-41b1-b5e9-0c7c379e2a4d"
+		}
+	],
+	"r2_buckets": [
+		{
+			"binding": "STORAGE",
+			"bucket_name": "walletwise-storage"
+		}
+	],
+	"triggers": {
+		"crons": ["0 * * * *"]
+	}
+}

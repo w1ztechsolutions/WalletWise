@@ -53,6 +53,10 @@ export class ApiError extends Error {
     this.details = details;
   }
 }
+export function describeApiError(error: unknown, retryGuidance: string): string {
+  if (error instanceof ApiError && error.status < 500) return error.message;
+  return retryGuidance;
+}
 
 interface ApiOptions extends RequestInit {
   params?: Record<string, string>;

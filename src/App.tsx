@@ -11,8 +11,11 @@ import { AccountsView } from '@/components/accounts/AccountsView'
 import { BudgetsView } from '@/components/budgets/BudgetsView'
 import { AnalyticsView } from '@/components/analytics/AnalyticsView'
 import { SettingsView } from '@/components/settings/SettingsView'
+import { AccountRecoveryView } from '@/components/settings/AccountRecoveryView'
+import { useUser } from '@/hooks/useUser'
 
 function AppContent() {
+  const { data: user, isLoading: isUserLoading } = useUser()
   const [activeTab, setActiveTab] = useState<NavTab>(() => {
     const hash = window.location.hash.replace('#', '') as NavTab
     const validTabs: NavTab[] = ['dashboard', 'transactions', 'accounts', 'budgets', 'analytics', 'settings']
@@ -37,6 +40,16 @@ function AppContent() {
     window.addEventListener('hashchange', handleHashChange)
     return () => window.removeEventListener('hashchange', handleHashChange)
   }, [])
+
+  if (isUserLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-ink text-muted text-sm" role="status">
+        Loading your account…
+      </div>
+    )
+  }
+
+  if (user?.deletionScheduledFor) return <AccountRecoveryView />
 
   return (
     <div

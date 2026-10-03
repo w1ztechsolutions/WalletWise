@@ -16,7 +16,8 @@
     "pages:dev": "wrangler pages dev dist --compatibility-flag=nodejs_compat",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply walletwise-db --local",
-    "db:migrate:remote": "wrangler d1 migrations apply walletwise-db --remote"
+    "db:migrate:remote": "wrangler d1 migrations apply walletwise-db --remote",
+    "account-purge:deploy": "wrangler deploy --config wrangler.account-purge.jsonc"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.104.1",

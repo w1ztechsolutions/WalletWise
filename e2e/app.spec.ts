@@ -1,4 +1,4 @@
-import { test, expect, signIn, requireCredentials, CREDENTIALS, trackRuntimeErrors, type Page } from './helpers';
+import { test, expect, signIn, requireCredentials, CREDENTIALS, trackRuntimeErrors, addRecordButton, type Page } from './helpers';
 
 /**
  * Authenticated data flows — dashboard, accounts, transactions, budgets,
@@ -95,6 +95,35 @@ test.describe('authenticated app', () => {
 
     await page.getByRole('button', { name: 'Export Reports' }).click();
     await expect(page.getByText(/export/i).first()).toBeVisible();
+  });
+
+  test('account deletion is read-only during recovery and can be restored', async ({ page }) => {
+    await openView(page, 'settings', /^Categories$/);
+    await page.getByRole('button', { name: 'Account deletion' }).click();
+    await page.getByLabel('Type DELETE to confirm').fill('DELETE');
+
+    const scheduleResponsePromise = page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === '/api/user/account-deletion' &&
+        response.request().method() === 'POST'
+    );
+    await page.getByRole('button', { name: 'Schedule account deletion' }).click();
+    const scheduleResponse = await scheduleResponsePromise;
+    expect(scheduleResponse.status()).toBe(200);
+
+    await expect(page.getByRole('heading', { name: 'Account deletion scheduled' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Account preview' })).toBeVisible();
+    await expect(addRecordButton(page)).toHaveCount(0);
+    expect((await page.request.get('/api/transactions')).status()).toBe(200);
+    expect((await page.request.post('/api/transactions', { data: {} })).status()).toBe(403);
+
+    await page.getByRole('button', { name: 'Restore account' }).click();
+    await expect(page.getByRole('button', { name: 'Add Category' })).toBeVisible({ timeout: 20_000 });
+
+    const profileResponse = await page.request.get('/api/user/me');
+    expect(profileResponse.status()).toBe(200);
+    const profile = (await profileResponse.json()) as { deletionScheduledFor: string | null };
+    expect(profile.deletionScheduledFor).toBeNull();
   });
 
   test('analytics view computes all-time summaries without NaN', async ({ page }) => {

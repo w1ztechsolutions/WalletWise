@@ -32,6 +32,8 @@ export const onRequestGet: PagesFunction<Env> = withErrorHandling(async (context
     email,
     avatar_url: image ?? undefined,
     currency,
+    deletionRequestedAt: rows[0]?.deletionRequestedAt ?? null,
+    deletionScheduledFor: rows[0]?.deletionScheduledFor ?? null,
   });
 });
 
@@ -101,5 +103,7 @@ export const onRequestPatch: PagesFunction<Env> = withErrorHandling(async (conte
     email,
     avatar_url: image ?? undefined,
     currency,
+    deletionRequestedAt: rows[0]?.deletionRequestedAt ?? null,
+    deletionScheduledFor: rows[0]?.deletionScheduledFor ?? null,
   });
 });

@@ -16,7 +16,7 @@ import {
 } from 'lucide-react'
 import { useFinance } from '@/context/FinanceContext'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { apiFetch } from '@/lib/api'
+import { apiFetch, describeApiError } from '@/lib/api'
 import { validateFileForKind } from '@/lib/storagePolicy'
 import {
   useTransactions,
@@ -249,35 +249,44 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
     const onError = (err: unknown) => {
       addToast(
         'Unable to save transaction',
-        err instanceof Error ? err.message : 'Please try again.',
+        describeApiError(
+          err,
+          'Your form is still open. Check Transactions before retrying if you are unsure whether it saved.'
+        ),
         'error'
       )
+    }
+    const closeForm = () => {
+      setIsAddModalOpen(false)
+      resetForm()
     }
 
     if (editingTransaction) {
       saveTransaction(
         { id: editingTransaction.id, ...payload },
         {
-          onSuccess: () => addToast('Transaction updated', 'Changes have been saved.', 'success'),
+          onSuccess: () => {
+            addToast('Transaction updated', 'Changes have been saved.', 'success')
+            closeForm()
+          },
           onError,
         }
       )
     } else {
       createTransaction(payload, {
-        onSuccess: () =>
+        onSuccess: () => {
           addToast(
             'Transaction recorded',
             `${payload.type === 'income' ? '+' : '-'}${payload.amount} for ${
               payload.description || payload.category_name
             }`,
             'success'
-          ),
+          )
+          closeForm()
+        },
         onError,
       })
     }
-
-    setIsAddModalOpen(false)
-    resetForm()
   }
 
   // Filtered Transactions

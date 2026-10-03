@@ -13,6 +13,7 @@ import {
   CreditCard,
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
+import { describeApiError } from '@/lib/api'
 import { useAccounts, useAddAccount, useUpdateAccount, useDeleteAccount } from '@/hooks/useAccounts'
 import { useCurrency } from '@/hooks/useUser'
 import { useFinance } from '@/context/FinanceContext'
@@ -114,28 +115,31 @@ export const AccountsView: React.FC = () => {
     const onError = (err: unknown) => {
       addToast(
         'Unable to save account',
-        err instanceof Error ? err.message : 'Please try again.',
+        describeApiError(
+          err,
+          'Your form is still open. Check Accounts before retrying if you are unsure whether it saved.'
+        ),
         'error'
       )
+    }
+    const onSuccess = () => {
+      addToast(
+        editingAccount ? 'Account updated' : 'Account created',
+        editingAccount ? 'Account details saved.' : `Added "${payload.name}"`,
+        'success'
+      )
+      setIsModalOpen(false)
+      resetForm()
     }
 
     if (editingAccount) {
       saveAccount(
         { id: editingAccount.id, ...payload },
-        {
-          onSuccess: () => addToast('Account updated', 'Account details saved.', 'success'),
-          onError,
-        }
+        { onSuccess, onError }
       )
     } else {
-      createAccount(payload, {
-        onSuccess: () => addToast('Account created', `Added "${payload.name}"`, 'success'),
-        onError,
-      })
+      createAccount(payload, { onSuccess, onError })
     }
-
-    setIsModalOpen(false)
-    resetForm()
   }
 
   // Totals calculations
@@ -456,10 +460,6 @@ export const AccountsView: React.FC = () => {
                 </label>
                 <input
                   type="text"
-                  maxLength={12}
-                  placeholder="•••• 4821"
-                  value={formData.account_number}
-                  onChange={(e) => setFormData({ ...formData, account_number: e.target.value })}
                   className="w-full px-3 py-2 text-sm rounded-xl bg-surface-3 border border-hairline text-platinum focus:outline-none focus:ring-2 focus:ring-indigo"
                 />
                 <p className="text-[10px] text-muted mt-1">

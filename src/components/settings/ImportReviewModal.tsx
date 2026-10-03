@@ -33,6 +33,7 @@ export const ImportReviewModal: React.FC<ImportReviewModalProps> = ({
   onCancel,
   onConfirm,
 }) => {
+  const currency = useCurrency();
   // Default is Skip: importing is additive, and the safe answer to "this already
   // exists" is to leave the stored row untouched.
   const [decisions, setDecisions] = useState<Record<string, DuplicateDecision>>({});
@@ -41,6 +42,7 @@ export const ImportReviewModal: React.FC<ImportReviewModalProps> = ({
     () => [...preview.duplicates.transactions, ...preview.duplicates.budgets],
     [preview]
   );
+  const readyCount = preview.newRows.transactions.length + preview.newRows.budgets.length;
 
   const decisionFor = (key: string): DuplicateDecision => decisions[key] ?? "skip";
 
@@ -85,6 +87,40 @@ export const ImportReviewModal: React.FC<ImportReviewModalProps> = ({
                 )}
               </ul>
             </div>
+          )}
+
+          {readyCount > 0 && (
+            <section className="space-y-2" aria-label="Rows ready to import">
+              <h4 className="text-xs font-semibold text-platinum">Ready to import ({readyCount})</h4>
+              <ul className="divide-y divide-hairline rounded-lg border border-hairline">
+                {preview.newRows.transactions.map((row, index) => (
+                  <li key={`transaction-${index}`} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-platinum truncate">
+                        {row.description || row.category_name}
+                      </p>
+                      <p className="text-[11px] text-muted">
+                        {row.date} · {row.type} · {row.category_name} · {accountLabel(row.account_id, accountNames)}
+                      </p>
+                    </div>
+                    <p className="shrink-0 text-xs font-semibold text-platinum">
+                      {formatCurrency(row.amount, currency)}
+                    </p>
+                  </li>
+                ))}
+                {preview.newRows.budgets.map((row, index) => (
+                  <li key={`budget-${index}`} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-platinum truncate">{row.category_name} budget</p>
+                      <p className="text-[11px] text-muted">{row.month} · Budget</p>
+                    </div>
+                    <p className="shrink-0 text-xs font-semibold text-platinum">
+                      {formatCurrency(row.planned_amount, currency)}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </section>
           )}
 
           {duplicates.length === 0 ? (

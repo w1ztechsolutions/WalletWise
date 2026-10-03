@@ -72,6 +72,8 @@ export const user = sqliteTable('user', {
   emailVerified: integer('emailVerified', { mode: 'boolean' }).notNull().default(false),
   image: text('image'),
   currency: text('currency').notNull().default('MWK'),
+  deletionRequestedAt: text('deletionRequestedAt'),
+  deletionScheduledFor: text('deletionScheduledFor'),
   createdAt: integer('createdAt', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
   updatedAt: integer('updatedAt', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
 })

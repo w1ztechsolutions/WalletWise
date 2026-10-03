@@ -21,6 +21,7 @@ Each bug is documented in its own individual file following the naming pattern: 
 | BUG-009 | [2026-10-02-auth-failures-silently-swallowed.md](./2026-10-02-auth-failures-silently-swallowed.md) | High | ✅ Resolved | 2026-10-02 |
 | BUG-010 | [2026-10-02-modal-dialogs-overflow-mobile-viewport.md](./2026-10-02-modal-dialogs-overflow-mobile-viewport.md) | High | ✅ Resolved | 2026-10-02 |
 | BUG-011 | [2026-10-02-signout-leaves-app-shell-mounted.md](./2026-10-02-signout-leaves-app-shell-mounted.md) | High | ✅ Resolved | 2026-10-02 |
+| BUG-012 | [2026-10-03-production-d1-migration-pending.md](./2026-10-03-production-d1-migration-pending.md) | Critical | ✅ Resolved | 2026-10-03 |
 
 > **BUG-006 is marked Resolved in the repository but was still live in
 > production.** The fix (`3871a7c`) was committed and never deployed; see

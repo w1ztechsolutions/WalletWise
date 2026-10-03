@@ -10,6 +10,35 @@ interface Env {
 
 const AUTH_PATH_PREFIX = "/api/auth";
 const API_PATH_PREFIX = "/api/";
+const ACCOUNT_DELETION_PATH = "/api/user/account-deletion";
+
+function readOnlyResponse(): Response {
+  return new Response(
+    JSON.stringify({
+      error: "Account deletion is pending. Restore your account to make changes.",
+      code: "FORBIDDEN",
+    }),
+    {
+      status: 403,
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-store",
+      },
+    }
+  );
+}
+
+async function isDeletionPending(db: D1Database, userId: string): Promise<boolean> {
+  const row = await db
+    .prepare('SELECT deletionScheduledFor FROM "user" WHERE id = ?')
+    .bind(userId)
+    .first<{ deletionScheduledFor: string | null }>();
+  return Boolean(row?.deletionScheduledFor);
+}
+
+function isMutation(method: string): boolean {
+  return method === "POST" || method === "PUT" || method === "PATCH" || method === "DELETE";
+}
 
 /**
  * Guards `context.next()` and reports anything it throws.
@@ -31,8 +60,16 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   context.data.requestId = crypto.randomUUID();
 
   try {
-    // Let auth routes pass through — they handle their own auth
+    // Auth routes handle their own session lifecycle. Keep sign-out available,
+    // but prevent authenticated account changes during the recovery window.
     if (pathname === "/api/auth" || pathname.startsWith(AUTH_PATH_PREFIX)) {
+      if (isMutation(context.request.method) && pathname !== `${AUTH_PATH_PREFIX}/sign-out`) {
+        const auth = createAuth(context.env.DB);
+        const session = await auth.api.getSession({ headers: context.request.headers });
+        if (session?.user && await isDeletionPending(context.env.DB, session.user.id)) {
+          return readOnlyResponse();
+        }
+      }
       return await context.next();
     }
 
@@ -59,6 +96,14 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       // Inject the authenticated user id so downstream handlers
       // (storage, AI parser, CRUD endpoints) can scope every operation.
       context.data.userId = session.user.id;
+
+      if (
+        isMutation(context.request.method) &&
+        pathname !== ACCOUNT_DELETION_PATH &&
+        await isDeletionPending(context.env.DB, session.user.id)
+      ) {
+        return readOnlyResponse();
+      }
 
       return await context.next();
     }

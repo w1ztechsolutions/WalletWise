@@ -40,6 +40,7 @@ interface DuplicateMatch<TIncoming, TExisting> {
 
 interface PreviewResponse {
   inserted: { transactions: number; budgets: number };
+  newRows: { transactions: ValidatedTransaction[]; budgets: ValidatedBudget[] };
   duplicates: {
     transactions: DuplicateMatch<ValidatedTransaction, Record<string, unknown>>[];
     budgets: DuplicateMatch<ValidatedBudget, Record<string, unknown>>[];
@@ -235,6 +236,8 @@ export const onRequestPost: PagesFunction<Env> = withErrorHandling(async (contex
     // occurrence would otherwise insert and collide with the first.
     const seenTx = new Set<string>();
     const seenBg = new Set<string>();
+    const newTransactions: ValidatedTransaction[] = [];
+    const newBudgets: ValidatedBudget[] = [];
     let insertedTx = 0;
     let insertedBg = 0;
 
@@ -247,6 +250,7 @@ export const onRequestPost: PagesFunction<Env> = withErrorHandling(async (contex
       } else {
         seenTx.add(key);
         insertedTx += 1;
+        newTransactions.push(row);
       }
     }
 
@@ -259,11 +263,13 @@ export const onRequestPost: PagesFunction<Env> = withErrorHandling(async (contex
       } else {
         seenBg.add(key);
         insertedBg += 1;
+        newBudgets.push(row);
       }
     }
 
     const response: PreviewResponse = {
       inserted: { transactions: insertedTx, budgets: insertedBg },
+      newRows: { transactions: newTransactions, budgets: newBudgets },
       duplicates: { transactions: duplicateTransactions, budgets: duplicateBudgets },
       invalid,
     };

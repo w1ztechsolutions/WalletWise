@@ -17,7 +17,7 @@ import {
 import * as XLSX from 'xlsx'
 import { useFinance } from '@/context/FinanceContext'
 import { formatCurrency, getCurrentMonth } from '@/lib/utils'
-import { apiFetch } from '@/lib/api'
+import { apiFetch, describeApiError } from '@/lib/api'
 import { validateFileForKind } from '@/lib/storagePolicy'
 import { normalizeSheets, type RawBudget, type RawTransaction } from '@/lib/importParser'
 import {
@@ -28,7 +28,8 @@ import {
 } from '@/hooks/useCategories'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useAccounts } from '@/hooks/useAccounts'
-import { useCurrency } from '@/hooks/useUser'
+import { useCurrency, useUser } from '@/hooks/useUser'
+import { useScheduleAccountDeletion } from '@/hooks/useAccountDeletion'
 import {
   useBulkImport,
   type ImportPayload,
@@ -84,7 +85,10 @@ export const SettingsView: React.FC = () => {
   const { previewImportAsync, commitImport, isCommitting: isCommittingImport } = useBulkImport()
 
   // Tab
-  const [activeSettingsTab, setActiveSettingsTab] = useState<'categories' | 'import' | 'reports'>('categories')
+  const [activeSettingsTab, setActiveSettingsTab] = useState<'categories' | 'import' | 'reports' | 'account'>('categories')
+  const [deletionConfirmation, setDeletionConfirmation] = useState('')
+  const { data: user } = useUser()
+  const { mutate: scheduleDeletion, isPending: isSchedulingDeletion } = useScheduleAccountDeletion()
 
   // Category modal
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
@@ -408,8 +412,12 @@ export const SettingsView: React.FC = () => {
       } else {
         addToast('No records found', 'The spreadsheet did not contain recognized columns.', 'info')
       }
-    } catch (err: any) {
-      addToast('Import error', err.message || 'Failed to parse Excel file', 'error')
+    } catch (err: unknown) {
+      addToast(
+        'Import error',
+        describeApiError(err, 'The spreadsheet could not be prepared. Check the file and try again.'),
+        'error'
+      )
     } finally {
       setIsImporting(false)
       setImportStatus(null)
@@ -449,7 +457,10 @@ export const SettingsView: React.FC = () => {
         onError: (err: unknown) =>
           addToast(
             'Import failed',
-            err instanceof Error ? err.message : 'Please try again.',
+            describeApiError(
+              err,
+              'Your review is still open. Check Transactions before retrying if you are unsure whether any rows were saved.'
+            ),
             'error'
           ),
       }
@@ -538,6 +549,22 @@ export const SettingsView: React.FC = () => {
     addToast('Report exported', `Generated report with ${filteredReport.length} records.`, 'success')
   }
 
+  const handleScheduleDeletion = (event: React.FormEvent) => {
+    event.preventDefault()
+    scheduleDeletion(undefined, {
+      onSuccess: (result) => {
+        setDeletionConfirmation('')
+        addToast(
+          'Deletion scheduled',
+          `Your account will be permanently deleted after ${new Date(result.deletionScheduledFor ?? '').toLocaleString()}.`,
+          'warning'
+        )
+      },
+      onError: (error: unknown) =>
+        addToast('Unable to schedule deletion', error instanceof Error ? error.message : 'Please try again.', 'error'),
+    })
+  }
+
   return (
     <div className="space-y-6 pb-20 md:pb-6">
       {/* Sub Tabs */}
@@ -572,7 +599,53 @@ export const SettingsView: React.FC = () => {
         >
           Export Reports
         </button>
+        <button
+          onClick={() => setActiveSettingsTab('account')}
+          className={`px-4 py-2 text-xs font-semibold rounded-xl transition-all ${
+            activeSettingsTab === 'account'
+              ? 'bg-surface text-platinum shadow-card'
+              : 'text-muted hover:text-platinum'
+          }`}
+        >
+          Account deletion
+        </button>
       </div>
+
+      {activeSettingsTab === 'account' && (
+        <section className="max-w-2xl space-y-5 border-t border-danger/40 pt-5" aria-labelledby="account-deletion-title">
+          <div>
+            <h3 id="account-deletion-title" className="text-base font-bold text-platinum">Delete your WalletWise account</h3>
+            <p className="text-xs text-muted mt-1">
+              Signed in as {user?.email ?? 'your account'}.
+            </p>
+          </div>
+          <div className="space-y-2 text-sm text-muted">
+            <p>Deletion starts with a 30-day recovery period. During that time, you can preview your financial data but cannot make changes.</p>
+            <p>Restore your account at any time before the deadline to regain access. After the deadline, your profile, credentials, financial records, and stored files are permanently deleted automatically.</p>
+          </div>
+          <form onSubmit={handleScheduleDeletion} className="space-y-3">
+            <label htmlFor="deletion-confirmation" className="block text-xs font-medium text-platinum">
+              Type DELETE to confirm
+            </label>
+            <input
+              id="deletion-confirmation"
+              value={deletionConfirmation}
+              onChange={(event) => setDeletionConfirmation(event.target.value)}
+              autoComplete="off"
+              className="w-full max-w-sm rounded-lg border border-hairline bg-surface px-3 py-2 text-sm text-platinum focus:outline-none focus:ring-2 focus:ring-danger"
+            />
+            <div>
+              <button
+                type="submit"
+                disabled={deletionConfirmation !== 'DELETE' || isSchedulingDeletion}
+                className="rounded-lg bg-danger px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                {isSchedulingDeletion ? 'Scheduling…' : 'Schedule account deletion'}
+              </button>
+            </div>
+          </form>
+        </section>
+      )}
 
       {/* 1. Category Management */}
       {activeSettingsTab === 'categories' && (

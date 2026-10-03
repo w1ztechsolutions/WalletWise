@@ -87,7 +87,15 @@ This document specifies the mandatory security architecture, protocols, and deve
 
 ---
 
-## 8. Reporting Security Issues
+## 8. Account Deletion Lifecycle
+
+1. Scheduling deletion marks the authenticated user with an ISO deletion deadline 30 days in the future. Credentials and user data remain available only for the recovery preview during this window.
+2. Every application write is blocked server-side while deletion is pending. Reads remain scoped to the authenticated user, and the only permitted mutations are account restoration and sign-out.
+3. Restoration is accepted only before the stored deadline and clears the deletion markers.
+4. The hourly `walletwise-account-purge` Cron Worker deletes user-prefixed R2 objects, finance records, Better Auth sessions and credentials, verification records, then the user row. A deletion is eligible only once its deadline has passed.
+5. Purge failures must be retried by later scheduled invocations; do not remove the user row before dependent records and files have been processed.
+
+## 9. Reporting Security Issues
 
 To report a vulnerability or security flaw, please contact:
 - **Email:** `wiztechsol.info@gmail.com`

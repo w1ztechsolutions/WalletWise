@@ -27,6 +27,26 @@ export interface ImportDuplicate<T> {
 
 export interface ImportPreview {
   inserted: { transactions: number; budgets: number };
+  newRows: {
+    transactions: {
+      date: string;
+      amount: number;
+      description: string;
+      category_id: string | null;
+      account_id: string | null;
+      category_name: string;
+      type: "income" | "expense";
+      is_recurring: boolean;
+      notes: string | null;
+    }[];
+    budgets: {
+      month: string;
+      planned_amount: number;
+      category_id: string | null;
+      category_name: string;
+      notes: string | null;
+    }[];
+  };
   duplicates: {
     transactions: ImportDuplicate<ImportTransactionRow>[];
     budgets: ImportDuplicate<ImportBudgetRow>[];
