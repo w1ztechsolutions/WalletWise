@@ -3,6 +3,7 @@ import { apiFetch } from "@/lib/api";
 import { transactionKeys } from "@/hooks/useTransactions";
 import { budgetKeys } from "@/hooks/useBudgets";
 import { analyticsKeys } from "@/hooks/useAnalytics";
+import { accountKeys } from "@/hooks/useAccounts";
 import type { Budget, Transaction } from "@/types";
 
 /** Rows as the client sends them — pre-validation, straight off the parser. */
@@ -85,6 +86,7 @@ export function useBulkImport() {
       queryClient.invalidateQueries({ queryKey: transactionKeys.all });
       queryClient.invalidateQueries({ queryKey: budgetKeys.all });
       queryClient.invalidateQueries({ queryKey: analyticsKeys.all });
+      queryClient.invalidateQueries({ queryKey: accountKeys.all });
     },
   });
 

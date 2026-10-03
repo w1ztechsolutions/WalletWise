@@ -26,6 +26,7 @@ export interface RawTransaction {
   amount: number
   description: string
   category: string
+  account: string
   type: TransactionType
   is_recurring: boolean
 }
@@ -35,6 +36,15 @@ export interface RawBudget {
   category: string
   planned_amount: number
 }
+
+export const ACCOUNT_COLUMN_HEADERS = [
+  'account name',
+  'wallet name',
+  'source account',
+  'source wallet',
+  'account',
+  'wallet',
+] as const
 
 export interface NormalizeOptions {
   /** Fallback date for rows without a usable one (YYYY-MM-DD). */
@@ -140,6 +150,9 @@ export function normalizeSheets(
         const typeKey = findKey(['type', 'kind'])
         const monthKey = findKey(['month', 'period'])
         const recurringKey = findKey(['recurring', 'repeat'])
+        const accountKey = ACCOUNT_COLUMN_HEADERS
+          .map((candidate) => keys.find((key) => key.toLowerCase().trim() === candidate))
+          .find((key) => key !== undefined)
 
         const rawAmount = amountKey ? parseAmount(row[amountKey]) : NaN
         if (isNaN(rawAmount) || rawAmount <= 0) continue
@@ -166,7 +179,8 @@ export function normalizeSheets(
         const date = parseDateCell(dateKey ? row[dateKey] : null) || defaultDate
         const isRecurring = recurringKey ? truthyCell(row[recurringKey]) : false
 
-        transactions.push({ date, amount: rawAmount, description, category: catName, type, is_recurring: isRecurring })
+        const account = (accountKey ? String(row[accountKey] ?? '') : '').trim().slice(0, 100)
+        transactions.push({ date, amount: rawAmount, description, category: catName, account, type, is_recurring: isRecurring })
       } catch {
         warnings.push(`Skipped an unreadable row in sheet "${sheetName}".`)
       }

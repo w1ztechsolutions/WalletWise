@@ -1,5 +1,5 @@
 import { eq, and, like, desc } from "drizzle-orm";
-import { transactions, categories } from "../../../src/db/schema";
+import { transactions, accounts } from "../../../src/db/schema";
 import { createDb, getAuthUser, json, error } from "../../lib/helpers";
 import { validateTransactionRow } from "../../lib/validation";
 import { withErrorHandling } from "../../lib/errors";
@@ -64,6 +64,14 @@ export const onRequestPost: PagesFunction<Env> = withErrorHandling(async (contex
   }
 
   const db = createDb(context.env);
+  if (validated.value.account_id) {
+    const [ownedAccount] = await db
+      .select({ id: accounts.id })
+      .from(accounts)
+      .where(and(eq(accounts.id, validated.value.account_id), eq(accounts.created_by_id, user.id)))
+      .limit(1);
+    if (!ownedAccount) return error("Account not found.", 404);
+  }
   const id = crypto.randomUUID();
 
   const result = await db
@@ -75,6 +83,7 @@ export const onRequestPost: PagesFunction<Env> = withErrorHandling(async (contex
       amount: validated.value.amount,
       description: validated.value.description,
       category_id: validated.value.category_id,
+      account_id: validated.value.account_id,
       category_name: validated.value.category_name,
       type: validated.value.type,
       is_recurring: validated.value.is_recurring,

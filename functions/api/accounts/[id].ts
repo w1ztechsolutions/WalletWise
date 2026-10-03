@@ -1,5 +1,5 @@
-import { eq, and } from "drizzle-orm";
-import { accounts } from "../../../src/db/schema";
+import { eq, and, sql } from "drizzle-orm";
+import { accounts, transactions } from "../../../src/db/schema";
 import { createDb, getAuthUser, json, error } from "../../lib/helpers";
 import { withErrorHandling } from "../../lib/errors";
 
@@ -19,9 +19,28 @@ export const onRequestGet: PagesFunction<Env> = withErrorHandling(async (context
 
   const db = createDb(context.env);
   const row = await db
-    .select()
+    .select({
+      id: accounts.id,
+      created_by_id: accounts.created_by_id,
+      name: accounts.name,
+      type: accounts.type,
+      institution: accounts.institution,
+      account_number: accounts.account_number,
+      opening_balance: accounts.opening_balance,
+      balance: sql<number>`${accounts.opening_balance} + COALESCE(SUM(CASE WHEN ${transactions.type} = 'income' THEN ${transactions.amount} ELSE -${transactions.amount} END), 0)`,
+      color: accounts.color,
+      notes: accounts.notes,
+      is_active: accounts.is_active,
+      created_date: accounts.created_date,
+      updated_date: accounts.updated_date,
+    })
     .from(accounts)
+    .leftJoin(
+      transactions,
+      and(eq(transactions.account_id, accounts.id), eq(transactions.created_by_id, user.id))
+    )
     .where(and(eq(accounts.id, id), eq(accounts.created_by_id, user.id)))
+    .groupBy(accounts.id)
     .limit(1);
 
   if (!row.length) return error("Account not found.", 404);
@@ -43,7 +62,7 @@ export const onRequestPut: PagesFunction<Env> = withErrorHandling(async (context
   }
 
   const updates: Record<string, unknown> = {};
-  const { name, type, institution, account_number, balance, color, notes, is_active } = body;
+  const { name, type, institution, account_number, color, notes, is_active } = body;
 
   if (name !== undefined) {
     if (typeof name !== "string" || !name.trim()) return error("Account name must be a non-empty string.");
@@ -63,9 +82,12 @@ export const onRequestPut: PagesFunction<Env> = withErrorHandling(async (context
     if (typeof account_number !== "string") return error("Account number must be a string.");
     updates.account_number = account_number;
   }
-  if (balance !== undefined) {
-    if (typeof balance !== "number") return error("Balance must be a number.");
-    updates.balance = balance;
+  const openingBalance = body.opening_balance ?? body.balance;
+  if (openingBalance !== undefined) {
+    if (typeof openingBalance !== "number" || !Number.isFinite(openingBalance)) {
+      return error("Opening balance must be a valid number.");
+    }
+    updates.opening_balance = openingBalance;
   }
   if (color !== undefined) {
     if (typeof color !== "string") return error("Color must be a string.");
@@ -91,7 +113,19 @@ export const onRequestPut: PagesFunction<Env> = withErrorHandling(async (context
     .returning();
 
   if (!result.length) return error("Account not found.", 404);
-  return json(result[0]);
+  const [current] = await db
+    .select({
+      balance: sql<number>`${accounts.opening_balance} + COALESCE(SUM(CASE WHEN ${transactions.type} = 'income' THEN ${transactions.amount} ELSE -${transactions.amount} END), 0)`,
+    })
+    .from(accounts)
+    .leftJoin(
+      transactions,
+      and(eq(transactions.account_id, accounts.id), eq(transactions.created_by_id, user.id))
+    )
+    .where(and(eq(accounts.id, id), eq(accounts.created_by_id, user.id)))
+    .groupBy(accounts.id)
+    .limit(1);
+  return json({ ...result[0], balance: current?.balance ?? result[0].opening_balance });
 });
 
 export const onRequestDelete: PagesFunction<Env> = withErrorHandling(async (context) => {

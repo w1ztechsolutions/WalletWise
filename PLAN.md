@@ -246,3 +246,12 @@ All records automatically include `id`, `created_date`, `updated_date`, and `cre
 - [x] Verified: `npx tsc -b` clean, `npm run lint` 0 errors, and **52/52 Playwright specs passing** across `desktop` and `mobile` against `wrangler pages dev`.
 - [ ] **Redeploy production (`BUG-008` — still open).** The live deployment is three commits stale and its D1 `database_id` is still the `local-walletwise-db` placeholder, so sign-up and sign-in return `500` for every visitor. The corrected `wrangler.jsonc` is already on `main`; this needs `npm run build && npx wrangler pages deploy dist --project-name walletwise --branch main`, then a `npm run test:e2e` run against the live URL to confirm.
 
+#### Phase 10: Account-Linked Transaction Ledger
+- [x] Add nullable `transactions.account_id` with account deletion setting historical links to `NULL`; preserve existing account balances as `opening_balance` (`ADR-005`).
+- [x] Derive account current balances from opening balance plus linked income and expenses; validate account ownership on transaction create, edit, and import.
+- [x] Add optional account selection and linked-account labels to manual transaction workflows; refresh account balances after transaction/import writes.
+- [x] Support an optional `Account` spreadsheet column in AI and deterministic parsing, templates, CSV exports, and duplicate review; leave absent or unmatched values unlinked.
+- [x] Add an end-to-end regression covering unlinked transaction behavior, editing a posted transaction to link an account, and balance restoration after deletion.
+- [x] Apply `0002_complex_miracleman.sql` to local D1 and run the full local verification suite (56/56 Playwright tests passed; final ledger/import flows rechecked on desktop and mobile).
+- [ ] Apply the migration to production D1 and deploy the updated Pages build after production rollout approval.
+

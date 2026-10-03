@@ -19,6 +19,7 @@ export interface Transaction {
   amount: number
   description: string
   category_id: string
+  account_id?: string | null
   category_name: string
   type: TransactionType
   is_recurring: boolean
@@ -50,6 +51,8 @@ export interface Account {
   type: AccountType
   institution: string
   account_number: string // Masked, e.g. "•••• 4821" or last 4 digits
+  opening_balance: number
+  /** Calculated from the opening balance and linked transactions. */
   balance: number
   color: string
   notes?: string

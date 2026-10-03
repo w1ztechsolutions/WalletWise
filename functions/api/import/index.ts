@@ -1,5 +1,5 @@
 import { and, eq, inArray } from "drizzle-orm";
-import { transactions, budgets } from "../../../src/db/schema";
+import { transactions, budgets, accounts } from "../../../src/db/schema";
 import { createDb, getAuthUser, json, error } from "../../lib/helpers";
 import { withErrorHandling } from "../../lib/errors";
 import {
@@ -111,6 +111,24 @@ export const onRequestPost: PagesFunction<Env> = withErrorHandling(async (contex
     );
   }
 
+  const db = createDb(context.env);
+  const requestedAccountIds = [
+    ...new Set(
+      rawTransactions
+        .map((row) => row.account_id)
+        .filter((id): id is string => typeof id === "string" && id.trim().length > 0)
+        .map((id) => id.trim())
+    ),
+  ];
+  const ownedAccountIds = new Set<string>();
+  if (requestedAccountIds.length > 0) {
+    const ownedAccounts = await db
+      .select({ id: accounts.id })
+      .from(accounts)
+      .where(and(eq(accounts.created_by_id, user.id), inArray(accounts.id, requestedAccountIds)));
+    for (const account of ownedAccounts) ownedAccountIds.add(account.id);
+  }
+
   // ---- Classify every row once; both modes share this step. ----
   const validTransactions: { row: ValidatedTransaction; key: string }[] = [];
   const validBudgets: { row: ValidatedBudget; key: string }[] = [];
@@ -119,7 +137,11 @@ export const onRequestPost: PagesFunction<Env> = withErrorHandling(async (contex
   rawTransactions.forEach((raw) => {
     const result = validateTransactionRow(raw);
     if (result.ok) {
-      validTransactions.push({ row: result.value, key: transactionRowKey(user.id, result.value) });
+      if (result.value.account_id && !ownedAccountIds.has(result.value.account_id)) {
+        invalid.push({ row: raw, entity: "transaction", reason: "Linked account not found.", key: "" });
+      } else {
+        validTransactions.push({ row: result.value, key: transactionRowKey(user.id, result.value) });
+      }
     } else {
       invalid.push({ row: raw, entity: "transaction", reason: result.reason, key: "" });
     }
@@ -135,8 +157,6 @@ export const onRequestPost: PagesFunction<Env> = withErrorHandling(async (contex
   });
 
   // ---- Look up existing rows that collide with the incoming keys. ----
-  const db = createDb(context.env);
-
   const existingTransactionsByKey = new Map<string, Record<string, unknown>>();
   if (validTransactions.length > 0) {
     const keysByIdentity = new Map<string, string>();
@@ -164,6 +184,7 @@ export const onRequestPost: PagesFunction<Env> = withErrorHandling(async (contex
         amount: Number(row.amount),
         description: String(row.description ?? ""),
         category_id: row.category_id ?? null,
+        account_id: row.account_id ?? null,
         category_name: String(row.category_name ?? ""),
         type: row.type,
         is_recurring: Boolean(row.is_recurring),

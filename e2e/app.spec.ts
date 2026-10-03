@@ -166,4 +166,124 @@ test.describe('authenticated app', () => {
 
     await expect(page.getByText(description)).toHaveCount(0, { timeout: 20_000 });
   });
+
+  test('linking an edited transaction updates its account balance', async ({ page }) => {
+    const accountName = `PW Ledger Account ${Date.now()}`;
+    const description = `PW Linked Expense ${Date.now()}`;
+
+    await openView(page, 'accounts', /Total Net Worth \(Active Accounts\)/);
+    await page.getByRole('button', { name: 'Add Account' }).click();
+    await page.getByPlaceholder('e.g. Daily Checking').fill(accountName);
+    await page.getByPlaceholder('0.00').fill('1000');
+    await page.getByRole('button', { name: 'Create Account' }).click();
+    await expect(page.getByText(accountName).first()).toBeVisible({ timeout: 20_000 });
+
+    const getAccountBalance = async () =>
+      page.evaluate(async (name) => {
+        const response = await fetch('/api/accounts');
+        if (!response.ok) throw new Error(`Account request failed: ${response.status}`);
+        const rows = (await response.json()) as { name: string; balance: number }[];
+        return rows.find((account) => account.name === name)?.balance;
+      }, accountName);
+
+    await openView(page, 'transactions', /Filtered Income/);
+    await page.getByRole('button', { name: 'New Transaction' }).click();
+    await page.getByPlaceholder('0.00').fill('42.50');
+    await page.getByPlaceholder('e.g. Grocery store, Client invoice').fill(description);
+    const createButton = page.getByRole('button', { name: 'Record Transaction' });
+    await createButton.scrollIntoViewIfNeeded();
+    await createButton.click();
+    await expect(page.getByText(description).first()).toBeVisible({ timeout: 20_000 });
+    await expect.poll(getAccountBalance).toBe(1000);
+
+    const row = page.locator('div.group').filter({ hasText: description }).last();
+    await row.hover();
+    await row.getByTitle('Edit transaction').click();
+    await page.locator('#transaction-account').selectOption({ label: `${accountName} · bank` });
+    const saveButton = page.getByRole('button', { name: 'Save Changes' });
+    await saveButton.scrollIntoViewIfNeeded();
+    await saveButton.click();
+    await expect.poll(getAccountBalance).toBeCloseTo(957.5, 2);
+
+    const linkedRow = page.locator('div.group').filter({ hasText: description }).last();
+    await linkedRow.hover();
+    await linkedRow.getByTitle('Delete transaction').click();
+    await page.getByRole('button', { name: 'Confirm Delete' }).click();
+    await expect.poll(getAccountBalance).toBe(1000);
+
+    await openView(page, 'accounts', /Total Net Worth \(Active Accounts\)/);
+    const card = page.locator('div.bg-surface').filter({ hasText: accountName }).last();
+    await card.hover();
+    await card.getByTitle('Delete account').click();
+    await page.getByRole('button', { name: 'Confirm Delete' }).click();
+    await expect(page.getByText(accountName)).toHaveCount(0, { timeout: 20_000 });
+  });
+
+  test('imports a transaction with an optional account column', async ({ page }) => {
+    const accountName = `PW Import Account ${Date.now()}`;
+    const description = `PW Imported Expense ${Date.now()}`;
+    const amount = 23.75;
+
+    await openView(page, 'accounts', /Total Net Worth \(Active Accounts\)/);
+    await page.getByRole('button', { name: 'Add Account' }).click();
+    await page.getByPlaceholder('e.g. Daily Checking').fill(accountName);
+    await page.getByPlaceholder('0.00').fill('500');
+    await page.getByRole('button', { name: 'Create Account' }).click();
+    await expect(page.getByText(accountName).first()).toBeVisible({ timeout: 20_000 });
+
+    await openView(page, 'settings', /^Categories$/);
+    await page.getByRole('button', { name: 'Excel & Templates' }).click();
+    const csv = [
+      'Date,Description,Category,Type,Amount,Recurring,Account,Notes',
+      `2026-10-03,${description},Groceries,expense,${amount},false,${accountName},`,
+    ].join('\n');
+    const parseResponsePromise = page.waitForResponse(
+      (response) => new URL(response.url()).pathname === '/api/ai/parse-spreadsheet'
+    );
+    await page.locator('input[type="file"]').first().setInputFiles({
+      name: 'account-transactions.csv',
+      mimeType: 'text/csv',
+      buffer: Buffer.from(csv),
+    });
+    const parseResponse = await parseResponsePromise;
+    expect(parseResponse.ok()).toBeTruthy();
+    const parsed = (await parseResponse.json()) as { transactions: { account: string }[] };
+    expect(parsed.transactions).toHaveLength(1);
+    expect(parsed.transactions[0].account.toLowerCase()).toBe(accountName.toLowerCase());
+
+    await expect(page.getByRole('heading', { name: 'Review Import' })).toBeVisible({ timeout: 30_000 });
+    await page.getByRole('button', { name: 'Confirm Import' }).click();
+    await expect(page.getByText(/Successfully imported 1 transactions/)).toBeVisible({ timeout: 20_000 });
+
+    const readAccountBalance = async () =>
+      page.evaluate(async (name) => {
+        const response = await fetch('/api/accounts');
+        if (!response.ok) throw new Error(`Account request failed: ${response.status}`);
+        const rows = (await response.json()) as { name: string; balance: number }[];
+        return rows.find((account) => account.name === name)?.balance;
+      }, accountName);
+
+    const transactionsResponse = await page.request.get('/api/transactions');
+    const rows = (await transactionsResponse.json()) as { id: string; description: string; account_id: string | null }[];
+    const imported = rows.find((transaction) => transaction.description === description);
+    const accountsResponse = await page.request.get('/api/accounts');
+    const accountRows = (await accountsResponse.json()) as { id: string; name: string }[];
+    const importedAccount = accountRows.find((account) => account.name === accountName);
+    expect(imported?.account_id, JSON.stringify(imported)).toBe(importedAccount?.id);
+    await expect.poll(readAccountBalance).toBeCloseTo(500 - amount, 2);
+
+    await openView(page, 'accounts', /Total Net Worth \(Active Accounts\)/);
+    const card = page.locator('div.bg-surface').filter({ hasText: accountName }).last();
+    await card.hover();
+    await card.getByTitle('Delete account').click();
+    await page.getByRole('button', { name: 'Confirm Delete' }).click();
+    await expect(page.getByText(accountName)).toHaveCount(0, { timeout: 20_000 });
+
+    const afterAccountDelete = await page.request.get('/api/transactions');
+    const remainingRows = (await afterAccountDelete.json()) as { id: string; description: string; account_id: string | null }[];
+    const remainingTransaction = remainingRows.find((transaction) => transaction.id === imported!.id);
+    expect(remainingTransaction?.description).toBe(description);
+    expect(remainingTransaction?.account_id).toBeNull();
+    await page.request.delete(`/api/transactions/${imported!.id}`);
+  });
 });

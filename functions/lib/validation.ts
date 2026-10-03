@@ -12,6 +12,7 @@ export interface ValidatedTransaction {
   amount: number;
   description: string;
   category_id: string | null;
+  account_id: string | null;
   category_name: string;
   type: "income" | "expense";
   is_recurring: boolean;
@@ -30,7 +31,7 @@ export interface ValidatedBudget {
 export function validateTransactionRow(
   row: Record<string, unknown>
 ): { ok: true; value: ValidatedTransaction } | { ok: false; reason: string } {
-  const { date, amount, description, category_id, category_name, type, is_recurring, notes } = row;
+  const { date, amount, description, category_id, account_id, category_name, type, is_recurring, notes } = row;
 
   if (typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     return { ok: false, reason: "Invalid date. Expected YYYY-MM-DD format." };
@@ -44,6 +45,9 @@ export function validateTransactionRow(
   if (typeof category_name !== "string" || !category_name.trim()) {
     return { ok: false, reason: "Category name is required." };
   }
+  if (account_id !== undefined && account_id !== null && typeof account_id !== "string") {
+    return { ok: false, reason: "Account must be a valid account ID." };
+  }
 
   return {
     ok: true,
@@ -52,6 +56,7 @@ export function validateTransactionRow(
       amount,
       description: typeof description === "string" ? description : "",
       category_id: typeof category_id === "string" ? category_id : null,
+      account_id: typeof account_id === "string" && account_id.trim() ? account_id.trim() : null,
       category_name: category_name.trim(),
       type: type as "income" | "expense",
       is_recurring: typeof is_recurring === "boolean" ? is_recurring : false,

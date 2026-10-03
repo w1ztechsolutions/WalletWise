@@ -44,7 +44,7 @@ export const AccountsView: React.FC = () => {
     type: AccountType
     institution: string
     account_number: string
-    balance: string
+    opening_balance: string
     color: string
     notes: string
     is_active: boolean
@@ -53,7 +53,7 @@ export const AccountsView: React.FC = () => {
     type: 'bank',
     institution: 'FNB',
     account_number: '',
-    balance: '',
+    opening_balance: '',
     color: PRESET_COLORS[0],
     notes: '',
     is_active: true,
@@ -65,7 +65,7 @@ export const AccountsView: React.FC = () => {
       type: 'bank',
       institution: 'FNB',
       account_number: '',
-      balance: '',
+      opening_balance: '',
       color: PRESET_COLORS[0],
       notes: '',
       is_active: true,
@@ -80,7 +80,7 @@ export const AccountsView: React.FC = () => {
       type: acc.type,
       institution: acc.institution,
       account_number: acc.account_number,
-      balance: String(acc.balance),
+      opening_balance: String(acc.opening_balance),
       color: acc.color,
       notes: acc.notes || '',
       is_active: acc.is_active,
@@ -90,7 +90,7 @@ export const AccountsView: React.FC = () => {
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault()
-    const bal = parseFloat(formData.balance) || 0
+    const openingBalance = parseFloat(formData.opening_balance) || 0
 
     // Mask account number if user typed plain digits (preserve only last 4)
     let masked = formData.account_number.trim()
@@ -105,7 +105,7 @@ export const AccountsView: React.FC = () => {
       type: formData.type,
       institution: formData.institution.trim(),
       account_number: masked,
-      balance: bal,
+      opening_balance: openingBalance,
       color: formData.color,
       notes: formData.notes.trim(),
       is_active: formData.is_active,
@@ -406,17 +406,20 @@ export const AccountsView: React.FC = () => {
 
                 <div>
                   <label className="block text-xs font-medium text-muted mb-1">
-                    Current Balance *
+                    Opening Balance *
                   </label>
                   <input
                     type="number"
                     step="0.01"
                     required
                     placeholder="0.00"
-                    value={formData.balance}
-                    onChange={(e) => setFormData({ ...formData, balance: e.target.value })}
+                    value={formData.opening_balance}
+                    onChange={(e) => setFormData({ ...formData, opening_balance: e.target.value })}
                     className="w-full px-3 py-2 text-sm rounded-xl bg-surface-3 border border-hairline text-platinum focus:outline-none focus:ring-2 focus:ring-indigo"
                   />
+                  <p className="text-[10px] text-muted mt-1">
+                    Current balance includes linked income and expenses.
+                  </p>
                 </div>
               </div>
 
@@ -535,7 +538,7 @@ export const AccountsView: React.FC = () => {
               Delete Account?
             </h4>
             <p className="text-xs text-muted mt-2">
-              This account will be permanently removed from your active net worth portfolio.
+              This account will be removed. Linked transactions will remain, but become unlinked.
             </p>
             <div className="flex items-center justify-center gap-3 mt-5">
               <button

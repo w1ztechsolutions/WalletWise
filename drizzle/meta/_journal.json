@@ -15,6 +15,13 @@
       "when": 1790957722485,
       "tag": "0001_orange_leader",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1791016024461,
+      "tag": "0002_complex_miracleman",
+      "breakpoints": true
     }
   ]
 }

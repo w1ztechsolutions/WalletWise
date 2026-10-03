@@ -1,5 +1,5 @@
 import { eq, and } from "drizzle-orm";
-import { transactions } from "../../../src/db/schema";
+import { transactions, accounts } from "../../../src/db/schema";
 import { createDb, getAuthUser, json, error } from "../../lib/helpers";
 import { withErrorHandling } from "../../lib/errors";
 
@@ -63,6 +63,22 @@ export const onRequestPut: PagesFunction<Env> = withErrorHandling(async (context
   }
   if (category_id !== undefined) {
     updates.category_id = typeof category_id === "string" ? category_id : null;
+  }
+  if (body.account_id !== undefined) {
+    if (body.account_id !== null && typeof body.account_id !== "string") {
+      return error("Account must be a valid account ID.");
+    }
+    const accountId = typeof body.account_id === "string" ? body.account_id.trim() : null;
+    if (accountId) {
+      const db = createDb(context.env);
+      const [ownedAccount] = await db
+        .select({ id: accounts.id })
+        .from(accounts)
+        .where(and(eq(accounts.id, accountId), eq(accounts.created_by_id, user.id)))
+        .limit(1);
+      if (!ownedAccount) return error("Account not found.", 404);
+    }
+    updates.account_id = accountId || null;
   }
   if (category_name !== undefined) {
     if (typeof category_name !== "string" || !category_name.trim()) {

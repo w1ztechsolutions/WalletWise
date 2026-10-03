@@ -6,6 +6,7 @@ import {
   isValidIsoMonth,
   normalizeSheets,
   parseAmount,
+  ACCOUNT_COLUMN_HEADERS,
   type ParsedSheetInput,
   type RawBudget,
   type RawTransaction,
@@ -44,12 +45,13 @@ const SYSTEM_PROMPT = `You are WalletWise's spreadsheet normalization engine. Yo
 
 Rules:
 - Output ONLY a JSON object of exactly this shape — no markdown fences, no commentary:
-{"transactions":[{"date":"YYYY-MM-DD","amount":0,"description":"","category":"","type":"expense","is_recurring":false}],"budgets":[{"month":"YYYY-MM","category":"","planned_amount":0}]}
+{"transactions":[{"date":"YYYY-MM-DD","amount":0,"description":"","category":"","account":"","type":"expense","is_recurring":false}],"budgets":[{"month":"YYYY-MM","category":"","planned_amount":0}]}
 - Transaction sheets produce entries in "transactions"; budget sheets produce entries in "budgets". I will tell you the sheet kind.
 - amount / planned_amount must be positive numbers (strip currency symbols and thousands separators).
 - dates must be strict YYYY-MM-DD and months strict YYYY-MM; use the provided defaults when a row lacks a usable value.
 - type is "income" only when an explicit column or the sheet hint says income, otherwise "expense".
 - category is the raw value of the category-like column, or "General" when absent.
+- account is the raw account or wallet name when an explicit account-like column exists, otherwise an empty string. Never infer or invent account names.
 - is_recurring is true only when a recurring/repeat column is explicitly true/yes/1.
 - Skip rows that have no usable amount. Never invent rows and never copy cell values longer than needed.`;
 
@@ -158,6 +160,7 @@ function sanitizeTransaction(item: unknown, defaults: SanitizeDefaults): RawTran
     amount,
     description: String(record.description ?? "").trim().slice(0, 200),
     category: String(record.category ?? "").trim().slice(0, 100) || "General",
+    account: String(record.account ?? "").trim().slice(0, 100),
     type,
     is_recurring: record.is_recurring === true || record.is_recurring === "true",
   };
@@ -336,6 +339,7 @@ export const onRequestPost: PagesFunction<Env> = withErrorHandling(async (contex
   };
 
   let aiBudgetLeft = MAX_AI_CHUNKS;
+  let usedExplicitAccountColumn = false;
 
   for (const sheet of sheets) {
     stats.rows += sheet.rows.length;
@@ -343,15 +347,24 @@ export const onRequestPost: PagesFunction<Env> = withErrorHandling(async (contex
 
     for (const rowsChunk of chunk(sheet.rows, CHUNK_SIZE)) {
       stats.chunks++;
+      const hasAccountColumn = rowsChunk.some((row) =>
+        Object.keys(row).some((key) =>
+          (ACCOUNT_COLUMN_HEADERS as readonly string[]).includes(key.toLowerCase().trim())
+        )
+      );
+      usedExplicitAccountColumn ||= hasAccountColumn;
 
       let aiResult: unknown | null = null;
-      if (context.env.AI && aiBudgetLeft > 0) {
+      if (context.env.AI && aiBudgetLeft > 0 && !hasAccountColumn) {
         aiBudgetLeft--;
         aiResult = await runAiChunk(context.env, sheet.name, isBudgetSheet, rowsChunk, defaults);
       }
 
-      if (aiResult !== null) {
-        const sanitized = sanitizeAiOutput(aiResult, isBudgetSheet, defaults);
+      const sanitized = aiResult === null ? null : sanitizeAiOutput(aiResult, isBudgetSheet, defaults);
+      if (
+        sanitized &&
+        (sanitized.transactions.length + sanitized.budgets.length > 0 || rowsChunk.length === 0)
+      ) {
         stats.aiChunks++;
         stats.dropped += sanitized.dropped;
         transactions.push(...sanitized.transactions);
@@ -363,6 +376,9 @@ export const onRequestPost: PagesFunction<Env> = withErrorHandling(async (contex
         }
       } else {
         stats.fallbackChunks++;
+        if (aiResult !== null) {
+          warnings.push(`AI returned no usable rows in sheet "${sheet.name}"; standard column matching was used.`);
+        }
         const fallback = normalizeSheets([{ name: sheet.name, rows: rowsChunk }], defaults);
         transactions.push(...fallback.transactions);
         budgets.push(...fallback.budgets);
@@ -372,7 +388,11 @@ export const onRequestPost: PagesFunction<Env> = withErrorHandling(async (contex
   }
 
   if (stats.aiChunks === 0 && stats.chunks > 0) {
-    warnings.push("AI parsing was unavailable; standard column matching was used instead.");
+    warnings.push(
+      usedExplicitAccountColumn
+        ? "Standard column matching was used to preserve the provided account names."
+        : "AI parsing was unavailable; standard column matching was used instead."
+    );
   }
 
   const source = stats.aiChunks === 0 ? "fallback" : stats.fallbackChunks === 0 ? "ai" : "mixed";

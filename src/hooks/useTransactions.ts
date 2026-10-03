@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, useRetry } from "@/lib/api";
 import { analyticsKeys } from "@/hooks/useAnalytics";
+import { accountKeys } from "@/hooks/useAccounts";
 import type { Transaction } from "@/types";
 
 export const transactionKeys = {
@@ -44,6 +45,7 @@ export function useTransactions(filters?: TransactionFilters) {
 function invalidateAfterTransactionWrite(queryClient: ReturnType<typeof useQueryClient>) {
   queryClient.invalidateQueries({ queryKey: transactionKeys.all });
   queryClient.invalidateQueries({ queryKey: analyticsKeys.all });
+  queryClient.invalidateQueries({ queryKey: accountKeys.all });
 }
 
 export function useAddTransaction() {

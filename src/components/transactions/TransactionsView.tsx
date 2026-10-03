@@ -25,6 +25,7 @@ import {
   useDeleteTransaction,
 } from '@/hooks/useTransactions'
 import { useCategories } from '@/hooks/useCategories'
+import { useAccounts } from '@/hooks/useAccounts'
 import { useCurrency } from '@/hooks/useUser'
 import type { Transaction, TransactionType } from '@/types'
 
@@ -38,6 +39,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
   const currency = useCurrency()
   const { data: transactions = [], isPending: isLoading } = useTransactions()
   const { data: categories = [] } = useCategories()
+  const { data: accounts = [] } = useAccounts()
   const { mutate: createTransaction, isPending: isCreating } = useAddTransaction()
   const { mutate: saveTransaction, isPending: isUpdating } = useUpdateTransaction()
   const { mutate: removeTransaction } = useDeleteTransaction()
@@ -58,6 +60,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
     amount: string
     description: string
     category_id: string
+    account_id: string
     type: TransactionType
     is_recurring: boolean
     notes: string
@@ -68,6 +71,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
     amount: '',
     description: '',
     category_id: '',
+    account_id: '',
     type: 'expense',
     is_recurring: false,
     notes: '',
@@ -97,6 +101,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
       amount: '',
       description: '',
       category_id: expenseCategoryId,
+      account_id: '',
       type: 'expense',
       is_recurring: false,
       notes: '',
@@ -114,6 +119,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
       amount: String(tx.amount),
       description: tx.description,
       category_id: tx.category_id,
+      account_id: tx.account_id ?? '',
       type: tx.type,
       is_recurring: tx.is_recurring,
       notes: tx.notes || '',
@@ -231,6 +237,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
       amount: amt,
       description: formData.description.trim(),
       category_id: activeCategoryId,
+      account_id: formData.account_id || null,
       category_name,
       type: formData.type,
       is_recurring: formData.is_recurring,
@@ -491,6 +498,11 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
                           <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-surface-3 text-muted">
                             {tx.category_name}
                           </span>
+                          {tx.account_id && (
+                            <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-gold/10 text-gold truncate max-w-36">
+                              {accounts.find((account) => account.id === tx.account_id)?.name ?? 'Account'}
+                            </span>
+                          )}
                           {tx.notes && (
                             <span className="text-xs text-muted truncate max-w-xs hidden sm:inline">
                               "{tx.notes}"
@@ -654,6 +666,26 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({ isAddModalOp
                         {cat.name}
                       </option>
                     ))}
+                </select>
+              </div>
+
+              {/* Account (optional) */}
+              <div>
+                <label htmlFor="transaction-account" className="block text-xs font-medium text-muted mb-1">
+                  Account (optional)
+                </label>
+                <select
+                  id="transaction-account"
+                  value={formData.account_id}
+                  onChange={(e) => setFormData({ ...formData, account_id: e.target.value })}
+                  className="w-full px-3 py-2 text-sm rounded-xl bg-surface-3 border border-hairline text-platinum focus:outline-none focus:ring-2 focus:ring-indigo"
+                >
+                  <option value="">No account</option>
+                  {accounts.map((account) => (
+                    <option key={account.id} value={account.id}>
+                      {account.name} · {account.type.replace('_', ' ')}{account.is_active ? '' : ' (inactive)'}
+                    </option>
+                  ))}
                 </select>
               </div>
 

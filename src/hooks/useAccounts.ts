@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, useRetry } from "@/lib/api";
+import { transactionKeys } from "@/hooks/useTransactions";
 import type { Account } from "@/types";
 
 export const accountKeys = {
@@ -19,7 +20,7 @@ export function useAccounts() {
 export function useAddAccount() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: Omit<Account, "id" | "created_by_id" | "created_date" | "updated_date">) =>
+    mutationFn: (data: Omit<Account, "id" | "created_by_id" | "created_date" | "updated_date" | "balance">) =>
       apiFetch<Account>("/accounts", {
         method: "POST",
         body: JSON.stringify(data),
@@ -33,7 +34,7 @@ export function useAddAccount() {
 export function useUpdateAccount() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...data }: { id: string } & Partial<Account>) =>
+    mutationFn: ({ id, ...data }: { id: string } & Partial<Omit<Account, "balance">>) =>
       apiFetch<Account>(`/accounts/${id}`, {
         method: "PUT",
         body: JSON.stringify(data),
@@ -53,6 +54,7 @@ export function useDeleteAccount() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: accountKeys.all });
+      queryClient.invalidateQueries({ queryKey: transactionKeys.all });
     },
   });
 }

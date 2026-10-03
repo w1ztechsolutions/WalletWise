@@ -13,6 +13,22 @@ export const categories = sqliteTable('categories', {
   updated_date: text('updated_date').notNull().default(sql`(CURRENT_TIMESTAMP)`),
 })
 
+// Accounts precede transactions so the nullable transaction FK can reference them.
+export const accounts = sqliteTable('accounts', {
+  id: text('id').primaryKey(),
+  created_by_id: text('created_by_id').notNull(),
+  name: text('name').notNull(),
+  type: text('type', { enum: ['cash', 'bank', 'mobile_wallet'] }).notNull(),
+  institution: text('institution').notNull().default(''),
+  account_number: text('account_number').notNull().default(''),
+  opening_balance: real('opening_balance').notNull().default(0),
+  color: text('color').notNull().default('#3b82f6'),
+  notes: text('notes'),
+  is_active: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+  created_date: text('created_date').notNull().default(sql`(CURRENT_TIMESTAMP)`),
+  updated_date: text('updated_date').notNull().default(sql`(CURRENT_TIMESTAMP)`),
+})
+
 // 2. Transactions Table
 export const transactions = sqliteTable('transactions', {
   id: text('id').primaryKey(),
@@ -21,6 +37,7 @@ export const transactions = sqliteTable('transactions', {
   amount: real('amount').notNull(), // strictly positive
   description: text('description').notNull().default(''),
   category_id: text('category_id').references(() => categories.id),
+  account_id: text('account_id').references(() => accounts.id, { onDelete: 'set null' }),
   category_name: text('category_name').notNull(),
   type: text('type', { enum: ['income', 'expense'] }).notNull(),
   is_recurring: integer('is_recurring', { mode: 'boolean' }).notNull().default(false),
@@ -46,22 +63,6 @@ export const budgets = sqliteTable('budgets', {
 }, (table) => [
   uniqueIndex('budget_user_month_category_idx').on(table.created_by_id, table.month, table.category_id),
 ])
-
-// 4. Accounts Table
-export const accounts = sqliteTable('accounts', {
-  id: text('id').primaryKey(),
-  created_by_id: text('created_by_id').notNull(),
-  name: text('name').notNull(),
-  type: text('type', { enum: ['cash', 'bank', 'mobile_wallet'] }).notNull(),
-  institution: text('institution').notNull().default(''),
-  account_number: text('account_number').notNull().default(''), // Masked last 4 digits only
-  balance: real('balance').notNull().default(0),
-  color: text('color').notNull().default('#3b82f6'),
-  notes: text('notes'),
-  is_active: integer('is_active', { mode: 'boolean' }).notNull().default(true),
-  created_date: text('created_date').notNull().default(sql`(CURRENT_TIMESTAMP)`),
-  updated_date: text('updated_date').notNull().default(sql`(CURRENT_TIMESTAMP)`),
-})
 
 // 5. Better Auth Database Tables for D1
 export const user = sqliteTable('user', {

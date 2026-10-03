@@ -12,6 +12,7 @@ import type {
 
 interface ImportReviewModalProps {
   preview: ImportPreview;
+  accountNames: Record<string, string>;
   isCommitting: boolean;
   onCancel: () => void;
   onConfirm: (decisions: Record<string, DuplicateDecision>) => void;
@@ -27,6 +28,7 @@ interface ImportReviewModalProps {
  */
 export const ImportReviewModal: React.FC<ImportReviewModalProps> = ({
   preview,
+  accountNames,
   isCommitting,
   onCancel,
   onConfirm,
@@ -98,6 +100,7 @@ export const ImportReviewModal: React.FC<ImportReviewModalProps> = ({
                   duplicate={dup as ImportDuplicate<ImportTransactionRow & ImportBudgetRow>}
                   isTransaction={isTransaction}
                   decision={decisionFor(dup.key)}
+                  accountNames={accountNames}
                   onChange={(next) => setDecision(dup.key, next)}
                   disabled={isCommitting}
                 />
@@ -138,6 +141,7 @@ interface DuplicateRowProps {
   duplicate: ImportDuplicate<ImportTransactionRow & ImportBudgetRow>;
   isTransaction: boolean;
   decision: DuplicateDecision;
+  accountNames: Record<string, string>;
   onChange: (decision: DuplicateDecision) => void;
   disabled: boolean;
 }
@@ -146,6 +150,7 @@ const DuplicateRow: React.FC<DuplicateRowProps> = ({
   duplicate,
   isTransaction,
   decision,
+  accountNames,
   onChange,
   disabled,
 }) => {
@@ -195,6 +200,9 @@ const DuplicateRow: React.FC<DuplicateRowProps> = ({
             {formatCurrency(Number(existing.amount ?? existing.planned_amount ?? 0), currency)}
           </p>
           <p className="text-muted truncate">{String(existing.description ?? existing.notes ?? "")}</p>
+          {isTransaction && (
+            <p className="text-muted truncate">Account: {accountLabel(existing.account_id, accountNames)}</p>
+          )}
         </div>
         <div className="p-3 space-y-0.5">
           <p className="text-muted font-semibold uppercase tracking-wide text-[10px]">Incoming</p>
@@ -206,8 +214,16 @@ const DuplicateRow: React.FC<DuplicateRowProps> = ({
             {formatCurrency(incoming.amount ?? incoming.planned_amount, currency)}
           </p>
           <p className="text-muted truncate">{incoming.description || incoming.notes || ""}</p>
+          {isTransaction && (
+            <p className="text-muted truncate">Account: {accountLabel(incoming.account_id, accountNames)}</p>
+          )}
         </div>
       </div>
     </div>
   );
 };
+
+function accountLabel(accountId: unknown, accountNames: Record<string, string>): string {
+  if (typeof accountId !== "string" || !accountId) return "Unlinked";
+  return accountNames[accountId] ?? "Unavailable account";
+}

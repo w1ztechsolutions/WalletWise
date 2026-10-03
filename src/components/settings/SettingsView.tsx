@@ -27,6 +27,7 @@ import {
   useDeleteCategory,
 } from '@/hooks/useCategories'
 import { useTransactions } from '@/hooks/useTransactions'
+import { useAccounts } from '@/hooks/useAccounts'
 import { useCurrency } from '@/hooks/useUser'
 import {
   useBulkImport,
@@ -35,7 +36,7 @@ import {
   type DuplicateDecision,
 } from '@/hooks/useBulkImport'
 import { ImportReviewModal } from './ImportReviewModal'
-import type { Category, TransactionType } from '@/types'
+import type { Account, Category, TransactionType } from '@/types'
 
 const PRESET_CATEGORY_COLORS = [
   '#10b981',
@@ -76,6 +77,7 @@ export const SettingsView: React.FC = () => {
   const currency = useCurrency()
   const { data: categories = [] } = useCategories()
   const { data: transactions = [] } = useTransactions()
+  const { data: accounts = [], isPending: isAccountsPending } = useAccounts()
   const { mutate: createCategory } = useAddCategory()
   const { mutate: saveCategory, isPending: isSavingCategory } = useUpdateCategory()
   const { mutate: removeCategory } = useDeleteCategory()
@@ -197,6 +199,11 @@ export const SettingsView: React.FC = () => {
     const file = e.target.files?.[0]
     if (!file) return
     e.target.value = ''
+
+    if (isAccountsPending) {
+      addToast('Accounts are loading', 'Wait for your accounts to load, then retry the import.', 'info')
+      return
+    }
 
     const invalid = validateFileForKind('import', file)
     if (invalid) {
@@ -338,19 +345,37 @@ export const SettingsView: React.FC = () => {
         return resolved.get(key) ?? categories.find((c) => c.name.toLowerCase() === key) ?? null
       }
 
+      const accountsByName = new Map<string, Account[]>()
+      for (const account of accounts) {
+        const key = account.name.trim().toLowerCase()
+        accountsByName.set(key, [...(accountsByName.get(key) ?? []), account])
+      }
+      const unmatchedAccountNames = new Set<string>()
       const extractedTransactions = result.transactions.map((t) => {
         const cat = lookupCategory(t.category)
+        const accountName = t.account.trim()
+        const matchingAccounts = accountName ? accountsByName.get(accountName.toLowerCase()) ?? [] : []
+        if (accountName && matchingAccounts.length !== 1) unmatchedAccountNames.add(accountName)
         return {
           date: t.date,
           amount: t.amount,
           description: t.description,
           category_id: cat?.id ?? '',
+          account_id: matchingAccounts.length === 1 ? matchingAccounts[0].id : null,
           category_name: cat?.name ?? (t.category || 'General'),
           type: t.type,
           is_recurring: t.is_recurring,
           notes: `Imported from ${file.name}`,
         }
       })
+
+      if (unmatchedAccountNames.size > 0) {
+        addToast(
+          'Some accounts were not linked',
+          `${unmatchedAccountNames.size} account name${unmatchedAccountNames.size === 1 ? '' : 's'} did not uniquely match an existing account. Those transactions will be imported unlinked.`,
+          'warning'
+        )
+      }
 
       const extractedBudgets = result.budgets.map((b) => {
         const cat = lookupCategory(b.category)
@@ -441,7 +466,7 @@ export const SettingsView: React.FC = () => {
     let csv = ''
     let filename = ''
     if (type === 'transactions') {
-      csv = 'Date,Description,Category,Type,Amount,Recurring,Notes\n2026-10-01,Monthly Rent,Rent & Housing,expense,850.00,true,Apartment lease\n2026-10-02,Client Payment,Freelance & Business,income,1200.00,false,Design project\n'
+      csv = 'Date,Description,Category,Type,Amount,Recurring,Account,Notes\n2026-10-01,Monthly Rent,Rent & Housing,expense,850.00,true,Daily Checking,Apartment lease\n2026-10-02,Client Payment,Freelance & Business,income,1200.00,false,,Design project\n'
       filename = 'walletwise_transactions_template.csv'
     } else {
       csv = 'Month,Category,PlannedAmount,Notes\n2026-10,Groceries & Food,500.00,Food budget cap\n2026-10,Utilities & Internet,150.00,Power and fiber\n'
@@ -482,11 +507,23 @@ export const SettingsView: React.FC = () => {
       link.click()
       document.body.removeChild(link)
     } else {
-      const headers = 'ID,Date,Description,Category,Type,Amount,Recurring,Notes\n'
+      const headers = 'ID,Date,Description,Category,Type,Amount,Recurring,Account,Notes\n'
+      const csvCell = (value: string) => `"${value.replace(/"/g, '""')}"`
+      const accountNames = new Map(accounts.map((account) => [account.id, account.name]))
       const rows = filteredReport
         .map(
           (t) =>
-            `"${t.id}","${t.date}","${t.description.replace(/"/g, '""')}","${t.category_name}","${t.type}",${t.amount},${t.is_recurring},"${(t.notes || '').replace(/"/g, '""')}"`
+            [
+              csvCell(t.id),
+              csvCell(t.date),
+              csvCell(t.description),
+              csvCell(t.category_name),
+              csvCell(t.type),
+              String(t.amount),
+              String(t.is_recurring),
+              csvCell(accountNames.get(t.account_id ?? '') ?? ''),
+              csvCell(t.notes || ''),
+            ].join(',')
         )
         .join('\n')
       const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' })
@@ -678,7 +715,7 @@ export const SettingsView: React.FC = () => {
                     <p className="text-xs font-bold text-platinum">
                       Transactions Template (.csv)
                     </p>
-                    <p className="text-[11px] text-muted">Date, Description, Category, Amount, Type</p>
+                    <p className="text-[11px] text-muted">Date, Description, Category, Type, Amount, Account</p>
                   </div>
                 </div>
                 <button
@@ -896,6 +933,7 @@ export const SettingsView: React.FC = () => {
       {pendingImport && importPreview && (
         <ImportReviewModal
           preview={importPreview}
+          accountNames={Object.fromEntries(accounts.map((account) => [account.id, account.name]))}
           isCommitting={isCommittingImport}
           onCancel={cancelImport}
           onConfirm={handleConfirmImport}
