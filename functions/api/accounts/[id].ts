@@ -10,6 +10,15 @@ interface Env {
   ENVIRONMENT?: string;
 }
 
+function normalizeAccountNumber(value: unknown): string {
+  if (typeof value !== "string") return "";
+
+  const digits = value.replace(/\D/g, "");
+  if (!digits) return "";
+
+  return digits.slice(-4);
+}
+
 export const onRequestGet: PagesFunction<Env> = withErrorHandling(async (context) => {
   const user = await getAuthUser(context.env, context.request);
   if (!user) return error("Unauthorized", 401);
@@ -80,7 +89,7 @@ export const onRequestPut: PagesFunction<Env> = withErrorHandling(async (context
   }
   if (account_number !== undefined) {
     if (typeof account_number !== "string") return error("Account number must be a string.");
-    updates.account_number = account_number;
+    updates.account_number = normalizeAccountNumber(account_number);
   }
   const openingBalance = body.opening_balance ?? body.balance;
   if (openingBalance !== undefined) {
@@ -136,9 +145,11 @@ export const onRequestDelete: PagesFunction<Env> = withErrorHandling(async (cont
   if (!id) return error("Account ID is required.");
 
   const db = createDb(context.env);
-  await db
+  const result = await db
     .delete(accounts)
-    .where(and(eq(accounts.id, id), eq(accounts.created_by_id, user.id)));
+    .where(and(eq(accounts.id, id), eq(accounts.created_by_id, user.id)))
+    .returning({ id: accounts.id });
 
+  if (!result.length) return error("Account not found.", 404);
   return json({ success: true });
 });

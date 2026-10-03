@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch, useRetry } from "@/lib/api";
+import { useSession } from "@/hooks/useSession";
 import type { Budget, Transaction } from "@/types";
 
 export type AnalyticsView = "overview" | "monthly" | "all-time";
@@ -28,8 +29,8 @@ export interface AnalyticsAllTime {
 }
 
 export const analyticsKeys = {
-  all: ["analytics"] as const,
-  view: (view: AnalyticsView) => [...analyticsKeys.all, view] as const,
+  all: (userId = "anonymous") => ["analytics", userId] as const,
+  view: (view: AnalyticsView, userId = "anonymous") => [...analyticsKeys.all(userId), view] as const,
 };
 
 /**
@@ -41,8 +42,11 @@ export const analyticsKeys = {
  * `useAnalytics<AnalyticsOverview>("overview")`.
  */
 export function useAnalytics<T = AnalyticsOverview>(view: AnalyticsView) {
+  const { user } = useSession();
+  const userId = user?.id ?? "anonymous";
+
   return useQuery({
-    queryKey: analyticsKeys.view(view),
+    queryKey: analyticsKeys.view(view, userId),
     queryFn: () => apiFetch<T>("/analytics", { params: { view } }),
     retry: useRetry,
   });

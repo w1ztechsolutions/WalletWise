@@ -4,6 +4,7 @@ import { transactionKeys } from "@/hooks/useTransactions";
 import { budgetKeys } from "@/hooks/useBudgets";
 import { analyticsKeys } from "@/hooks/useAnalytics";
 import { accountKeys } from "@/hooks/useAccounts";
+import { useSession } from "@/hooks/useSession";
 import type { Budget, Transaction } from "@/types";
 
 /** Rows as the client sends them — pre-validation, straight off the parser. */
@@ -65,6 +66,8 @@ export type DuplicateDecision = "skip" | "replace";
 
 export function useBulkImport() {
   const queryClient = useQueryClient();
+  const { user } = useSession();
+  const userId = user?.id ?? "anonymous";
 
   /**
    * Phase 1 — classify without writing. Nothing reaches D1 until `commitImport`
@@ -103,10 +106,10 @@ export function useBulkImport() {
     onSuccess: () => {
       // Import rewrites both collections, and the dashboard/analytics figures are
       // derived from them — invalidating only transactions would leave stale totals.
-      queryClient.invalidateQueries({ queryKey: transactionKeys.all });
-      queryClient.invalidateQueries({ queryKey: budgetKeys.all });
-      queryClient.invalidateQueries({ queryKey: analyticsKeys.all });
-      queryClient.invalidateQueries({ queryKey: accountKeys.all });
+      queryClient.invalidateQueries({ queryKey: transactionKeys.all(userId) });
+      queryClient.invalidateQueries({ queryKey: budgetKeys.all(userId) });
+      queryClient.invalidateQueries({ queryKey: analyticsKeys.all(userId) });
+      queryClient.invalidateQueries({ queryKey: accountKeys.all(userId) });
     },
   });
 

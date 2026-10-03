@@ -123,9 +123,11 @@ export const onRequestDelete: PagesFunction<Env> = withErrorHandling(async (cont
   if (!id) return error("Transaction ID is required.");
 
   const db = createDb(context.env);
-  await db
+  const result = await db
     .delete(transactions)
-    .where(and(eq(transactions.id, id), eq(transactions.created_by_id, user.id)));
+    .where(and(eq(transactions.id, id), eq(transactions.created_by_id, user.id)))
+    .returning({ id: transactions.id });
 
+  if (!result.length) return error("Transaction not found.", 404);
   return json({ success: true });
 });

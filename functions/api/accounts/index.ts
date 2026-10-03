@@ -10,6 +10,15 @@ interface Env {
   ENVIRONMENT?: string;
 }
 
+function normalizeAccountNumber(value: unknown): string {
+  if (typeof value !== "string") return "";
+
+  const digits = value.replace(/\D/g, "");
+  if (!digits) return "";
+
+  return digits.slice(-4);
+}
+
 export const onRequestGet: PagesFunction<Env> = withErrorHandling(async (context) => {
   const user = await getAuthUser(context.env, context.request);
   if (!user) return error("Unauthorized", 401);
@@ -77,7 +86,7 @@ export const onRequestPost: PagesFunction<Env> = withErrorHandling(async (contex
       name: name.trim(),
       type: type as "cash" | "bank" | "mobile_wallet",
       institution: typeof institution === "string" ? institution : "",
-      account_number: typeof account_number === "string" ? account_number : "",
+      account_number: normalizeAccountNumber(account_number),
       opening_balance: openingBalance,
       color: typeof color === "string" ? color : "#3b82f6",
       notes: typeof notes === "string" ? notes : null,

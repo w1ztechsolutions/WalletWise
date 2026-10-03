@@ -99,9 +99,11 @@ export const onRequestDelete: PagesFunction<Env> = withErrorHandling(async (cont
     return error("Cannot delete category. Transactions are linked to it.", 409);
   }
 
-  await db
+  const result = await db
     .delete(categories)
-    .where(and(eq(categories.id, id), eq(categories.created_by_id, user.id)));
+    .where(and(eq(categories.id, id), eq(categories.created_by_id, user.id)))
+    .returning({ id: categories.id });
 
+  if (!result.length) return error("Category not found.", 404);
   return json({ success: true });
 });

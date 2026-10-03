@@ -1,15 +1,19 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
+import { useSession } from "@/hooks/useSession";
 import type { User } from "@/types";
 
 export const userKeys = {
-  all: ["user"] as const,
-  profile: () => [...userKeys.all, "profile"] as const,
+  all: (userId = "anonymous") => ["user", userId] as const,
+  profile: (userId = "anonymous") => [...userKeys.all(userId), "profile"] as const,
 };
 
 export function useUser() {
+  const { user } = useSession();
+  const userId = user?.id ?? "anonymous";
+
   return useQuery({
-    queryKey: userKeys.profile(),
+    queryKey: userKeys.profile(userId),
     queryFn: () => apiFetch<User>("/user/me"),
     retry: false,
   });
@@ -17,6 +21,9 @@ export function useUser() {
 
 export function useUpdateUser() {
   const queryClient = useQueryClient();
+  const { user } = useSession();
+  const userId = user?.id ?? "anonymous";
+
   return useMutation({
     mutationFn: (data: Partial<User>) =>
       apiFetch<User>("/user/me", {
@@ -24,7 +31,7 @@ export function useUpdateUser() {
         body: JSON.stringify(data),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: userKeys.all });
+      queryClient.invalidateQueries({ queryKey: userKeys.all(userId) });
     },
   });
 }

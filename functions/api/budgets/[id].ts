@@ -93,9 +93,11 @@ export const onRequestDelete: PagesFunction<Env> = withErrorHandling(async (cont
   if (!id) return error("Budget ID is required.");
 
   const db = createDb(context.env);
-  await db
+  const result = await db
     .delete(budgets)
-    .where(and(eq(budgets.id, id), eq(budgets.created_by_id, user.id)));
+    .where(and(eq(budgets.id, id), eq(budgets.created_by_id, user.id)))
+    .returning({ id: budgets.id });
 
+  if (!result.length) return error("Budget not found.", 404);
   return json({ success: true });
 });
