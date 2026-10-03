@@ -568,7 +568,7 @@ export const SettingsView: React.FC = () => {
   return (
     <div className="space-y-6 pb-20 md:pb-6">
       {/* Sub Tabs */}
-      <div className="flex items-center gap-2 p-1 bg-surface-2 rounded-2xl w-fit">
+      <div className="flex flex-wrap items-center gap-2 p-1 bg-surface-2 rounded-2xl w-fit max-w-full">
         <button
           onClick={() => setActiveSettingsTab('categories')}
           className={`px-4 py-2 text-xs font-semibold rounded-xl transition-all ${
