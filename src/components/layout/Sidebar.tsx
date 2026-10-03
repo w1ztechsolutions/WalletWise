@@ -95,7 +95,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, activeTab, on
         {/* Header — WalletWise Branding */}
         <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid var(--border)' }}>
           <div className="flex items-center gap-2">
-            <img src="/logo_title_bar.jpg" alt="" className="w-8 h-8 rounded-lg object-cover" />
+            <img src="/logo_title_bar.png" alt="" className="w-8 h-8 rounded-lg object-contain" />
             <span className="text-lg font-bold brand-title">WalletWise</span>
           </div>
           <button

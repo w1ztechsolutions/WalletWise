@@ -114,10 +114,14 @@ export const AuthView: React.FC = () => {
         {/* Brand */}
         <div className="flex flex-col items-center mb-6">
           <img
-            src="/logo.jpg"
-            alt="WalletWise Personal Finance Tracker"
-            className="w-56 h-40 rounded-xl object-cover"
+            src="/logo_title_bar.png"
+            alt=""
+            className="w-28 h-28 object-contain"
           />
+          <h1 className="text-xl font-bold brand-title mt-2">WalletWise</h1>
+          <p className="text-[11px] font-semibold uppercase text-muted mt-1">
+            Personal Finance Tracker
+          </p>
         </div>
 
         {/* Card */}
@@ -243,8 +247,8 @@ export const AuthView: React.FC = () => {
             type="button"
             onClick={switchMode}
             disabled={isPending}
-            className="w-full mt-4 text-xs font-medium transition-colors disabled:opacity-60"
-            style={{ color: "var(--text-secondary)" }}
+            className="w-full mt-4 text-xs font-bold cursor-pointer transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            style={{ color: "var(--accent-gold)" }}
           >
             {COPY[mode].switchLabel}
           </button>
