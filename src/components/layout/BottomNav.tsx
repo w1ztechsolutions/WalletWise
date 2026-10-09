@@ -1,5 +1,5 @@
 import React from 'react'
-import { LayoutDashboard, Receipt, WalletCards, PiggyBank, BarChart3, Settings } from 'lucide-react'
+import { LayoutDashboard, Receipt, WalletCards, PiggyBank, BarChart3, Settings, ArrowLeftRight } from 'lucide-react'
 import type { NavTab } from './Sidebar'
 
 interface BottomNavProps {
@@ -11,6 +11,7 @@ const NAV_ITEMS: { id: NavTab; label: string; icon: React.ComponentType<{ classN
   { id: 'dashboard',    label: 'Home',    icon: LayoutDashboard },
   { id: 'transactions', label: 'Records', icon: Receipt },
   { id: 'accounts',     label: 'Wallets', icon: WalletCards },
+  { id: 'transfers',    label: 'Move',    icon: ArrowLeftRight },
   { id: 'budgets',      label: 'Budgets', icon: PiggyBank },
   { id: 'analytics',    label: 'Charts',  icon: BarChart3 },
   { id: 'settings',     label: 'Settings',icon: Settings },
@@ -25,7 +26,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onSelectTab }) 
       borderTop: '1px solid var(--border)',
     }}
   >
-    <div className="grid grid-cols-6 h-16">
+    <div className="grid grid-cols-7 h-16">
       {NAV_ITEMS.map((item) => {
         const Icon = item.icon
         const isActive = activeTab === item.id

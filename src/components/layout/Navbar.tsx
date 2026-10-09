@@ -16,6 +16,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenSidebar, activeTab, onOpen
     dashboard:    'Dashboard',
     transactions: 'Transactions',
     accounts:     'Accounts & Wallets',
+    transfers:    'Transfers',
     budgets:      'Budgets & Planning',
     analytics:    'Financial Analytics',
     settings:     'Settings & Data',

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useState } from 'react'
 import {
   TrendingUp,
   TrendingDown,
@@ -28,15 +28,38 @@ import {
   useAnalytics,
   type AnalyticsAllTime,
   type AnalyticsMonthly,
+  type AnalyticsRange,
 } from '@/hooks/useAnalytics'
 import { useCategories } from '@/hooks/useCategories'
 import { useCurrency } from '@/hooks/useUser'
 
 export const AnalyticsView: React.FC = () => {
   const currency = useCurrency()
-  const { data: allTime, isPending: isLoadingAllTime } = useAnalytics('all-time')
-  const { data: monthly, isPending: isLoadingMonthly } = useAnalytics('monthly')
+  const [preset, setPreset] = useState<'6' | '12' | '24' | 'all' | 'custom'>('6')
+  const [customStart, setCustomStart] = useState('')
+  const [customEnd, setCustomEnd] = useState('')
+
+  const range: AnalyticsRange = useMemo(() => {
+    if (preset === 'all') return { months: 'all' as const }
+    if (preset === 'custom' && customStart && customEnd) return { start: customStart, end: customEnd }
+    if (preset === 'custom') return { months: 6 }
+    return { months: Number(preset) }
+  }, [preset, customStart, customEnd])
+
+  const { data: allTime, isPending: isLoadingAllTime } = useAnalytics('all-time', range)
+  const { data: monthly, isPending: isLoadingMonthly } = useAnalytics('monthly', range)
   const { data: categories } = useCategories()
+
+  const rangeLabel = useMemo(() => {
+    const start = (monthly as AnalyticsMonthly | undefined)?.start ?? (allTime as AnalyticsAllTime | undefined)?.start
+    const end = (monthly as AnalyticsMonthly | undefined)?.end ?? (allTime as AnalyticsAllTime | undefined)?.end
+    if (!start || !end) return 'All recorded periods'
+    const fmt = (ym: string) => {
+      const [y, m] = ym.split('-').map(Number)
+      return new Date(y, m - 1, 1).toLocaleString('en-US', { month: 'short', year: 'numeric' })
+    }
+    return `${fmt(start)} – ${fmt(end)}`
+  }, [monthly, allTime])
 
   // 1. All-time summary
   const summary = useMemo(() => {
@@ -48,7 +71,7 @@ export const AnalyticsView: React.FC = () => {
     return { income, expenses, net, savingsRate }
   }, [allTime])
 
-  // 2. Monthly Income vs Expenses Trend (6-month window served by the API)
+  // 2. Monthly Income vs Expenses Trend (window served by the API per `range`)
   const monthlyTrend = useMemo(() => {
     const months = (monthly as AnalyticsMonthly | undefined)?.months ?? []
     return months.map((row) => {
@@ -98,6 +121,43 @@ export const AnalyticsView: React.FC = () => {
 
   return (
     <div className="space-y-6 pb-20 md:pb-6">
+      {/* Date range filter */}
+      <div className="bg-surface rounded-2xl p-4 border border-hairline shadow-card flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
+          {(['6', '12', '24', 'all', 'custom'] as const).map((p) => (
+            <button
+              key={p}
+              onClick={() => setPreset(p)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${preset === p ? 'bg-gold text-ink shadow-gold' : 'text-muted hover:bg-surface-3'}`}
+            >
+              {p === '6' ? '6M' : p === '12' ? '12M' : p === '24' ? '24M' : p === 'all' ? 'All' : 'Custom'}
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {preset === 'custom' && (
+            <>
+              <input
+                type="month"
+                value={customStart}
+                onChange={(e) => setCustomStart(e.target.value)}
+                className="px-2.5 py-1.5 rounded-xl text-xs bg-surface-3 border border-hairline text-platinum"
+                aria-label="Start month"
+              />
+              <span className="text-xs text-muted">to</span>
+              <input
+                type="month"
+                value={customEnd}
+                onChange={(e) => setCustomEnd(e.target.value)}
+                className="px-2.5 py-1.5 rounded-xl text-xs bg-surface-3 border border-hairline text-platinum"
+                aria-label="End month"
+              />
+            </>
+          )}
+          <span className="text-xs text-muted">{rangeLabel}</span>
+        </div>
+      </div>
+
       {/* 4 Stat Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
         <div className="bg-surface rounded-2xl p-4 sm:p-5 border border-hairline shadow-card">
@@ -143,7 +203,7 @@ export const AnalyticsView: React.FC = () => {
             <h3 className="text-base font-bold text-platinum">
               Monthly Income vs Expenses Trend
             </h3>
-            <p className="text-xs text-muted">Historical performance across all recorded periods</p>
+            <p className="text-xs text-muted">{rangeLabel}</p>
           </div>
         </div>
 

@@ -62,6 +62,19 @@ export interface Account {
   created_by_id: string
 }
 
+export interface Transfer {
+  id: string
+  from_account_id: string | null
+  to_account_id: string | null
+  amount: number
+  date: string // YYYY-MM-DD
+  description: string
+  notes?: string | null
+  created_date?: string
+  updated_date?: string
+  created_by_id: string
+}
+
 export interface User {
   id: string
   name: string

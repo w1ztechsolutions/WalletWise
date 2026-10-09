@@ -71,6 +71,7 @@ export const NAV_TABS = [
   { id: 'dashboard', drawer: 'Dashboard', mobile: 'Home', title: 'Dashboard' },
   { id: 'transactions', drawer: 'Transactions', mobile: 'Records', title: 'Transactions' },
   { id: 'accounts', drawer: 'Accounts', mobile: 'Wallets', title: 'Accounts & Wallets' },
+  { id: 'transfers', drawer: 'Transfers', mobile: 'Move', title: 'Transfers' },
   { id: 'budgets', drawer: 'Budgets', mobile: 'Budgets', title: 'Budgets & Planning' },
   { id: 'analytics', drawer: 'Analytics', mobile: 'Charts', title: 'Financial Analytics' },
   { id: 'settings', drawer: 'Settings', mobile: 'Settings', title: 'Settings & Data' },

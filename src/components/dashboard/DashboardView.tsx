@@ -292,6 +292,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab, onO
             <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Income vs Expenses</h2>
             <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Last 6 Months</span>
           </div>
+          {monthlyTrendData.every((d) => d.Income === 0 && d.Expenses === 0) ? (
+            <div className="h-64 w-full flex flex-col items-center justify-center text-center">
+              <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>No data for this period</p>
+              <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>Record a transaction to populate the trend.</p>
+            </div>
+          ) : (
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={monthlyTrendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -306,6 +312,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateTab, onO
               </BarChart>
             </ResponsiveContainer>
           </div>
+          )}
         </div>
       </div>
 

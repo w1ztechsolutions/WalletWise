@@ -64,6 +64,22 @@ export const budgets = sqliteTable('budgets', {
   uniqueIndex('budget_user_month_category_idx').on(table.created_by_id, table.month, table.category_id),
 ])
 
+// 4. Transfers Table — moving funds between the user's own accounts.
+// Kept separate from `transactions` so a transfer is never counted as income
+// or expense in analytics; account balances add/subtract these explicitly.
+export const transfers = sqliteTable('transfers', {
+  id: text('id').primaryKey(),
+  created_by_id: text('created_by_id').notNull(),
+  from_account_id: text('from_account_id').references(() => accounts.id, { onDelete: 'set null' }),
+  to_account_id: text('to_account_id').references(() => accounts.id, { onDelete: 'set null' }),
+  amount: real('amount').notNull(), // strictly positive
+  date: text('date').notNull(), // ISO YYYY-MM-DD
+  description: text('description').notNull().default(''),
+  notes: text('notes'),
+  created_date: text('created_date').notNull().default(sql`(CURRENT_TIMESTAMP)`),
+  updated_date: text('updated_date').notNull().default(sql`(CURRENT_TIMESTAMP)`),
+})
+
 // 5. Better Auth Database Tables for D1
 export const user = sqliteTable('user', {
   id: text('id').primaryKey(),

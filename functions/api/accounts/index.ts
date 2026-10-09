@@ -1,5 +1,5 @@
 import { and, eq, sql } from "drizzle-orm";
-import { accounts, transactions } from "../../../src/db/schema";
+import { accounts, transactions, transfers } from "../../../src/db/schema";
 import { createDb, getAuthUser, json, error } from "../../lib/helpers";
 import { withErrorHandling } from "../../lib/errors";
 
@@ -33,7 +33,7 @@ export const onRequestGet: PagesFunction<Env> = withErrorHandling(async (context
       institution: accounts.institution,
       account_number: accounts.account_number,
       opening_balance: accounts.opening_balance,
-      balance: sql<number>`${accounts.opening_balance} + COALESCE(SUM(CASE WHEN ${transactions.type} = 'income' THEN ${transactions.amount} ELSE -${transactions.amount} END), 0)`,
+      balance: sql<number>`${accounts.opening_balance} + COALESCE(SUM(CASE WHEN ${transactions.type} = 'income' THEN ${transactions.amount} ELSE -${transactions.amount} END), 0) - COALESCE((SELECT SUM(${transfers.amount}) FROM ${transfers} WHERE ${transfers.from_account_id} = ${accounts.id} AND ${transfers.created_by_id} = ${user.id}), 0) + COALESCE((SELECT SUM(${transfers.amount}) FROM ${transfers} WHERE ${transfers.to_account_id} = ${accounts.id} AND ${transfers.created_by_id} = ${user.id}), 0)`,
       color: accounts.color,
       notes: accounts.notes,
       is_active: accounts.is_active,

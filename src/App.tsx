@@ -8,6 +8,7 @@ import { ToastContainer } from '@/components/ui/Toast'
 import { DashboardView } from '@/components/dashboard/DashboardView'
 import { TransactionsView } from '@/components/transactions/TransactionsView'
 import { AccountsView } from '@/components/accounts/AccountsView'
+import { TransfersView } from '@/components/transfers/TransfersView'
 import { BudgetsView } from '@/components/budgets/BudgetsView'
 import { AnalyticsView } from '@/components/analytics/AnalyticsView'
 import { SettingsView } from '@/components/settings/SettingsView'
@@ -18,7 +19,7 @@ function AppContent() {
   const { data: user, isLoading: isUserLoading } = useUser()
   const [activeTab, setActiveTab] = useState<NavTab>(() => {
     const hash = window.location.hash.replace('#', '') as NavTab
-    const validTabs: NavTab[] = ['dashboard', 'transactions', 'accounts', 'budgets', 'analytics', 'settings']
+    const validTabs: NavTab[] = ['dashboard', 'transactions', 'accounts', 'transfers', 'budgets', 'analytics', 'settings']
     return validTabs.includes(hash) ? hash : 'dashboard'
   })
 
@@ -34,7 +35,7 @@ function AppContent() {
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace('#', '') as NavTab
-      const validTabs: NavTab[] = ['dashboard', 'transactions', 'accounts', 'budgets', 'analytics', 'settings']
+      const validTabs: NavTab[] = ['dashboard', 'transactions', 'accounts', 'transfers', 'budgets', 'analytics', 'settings']
       if (validTabs.includes(hash)) setActiveTab(hash)
     }
     window.addEventListener('hashchange', handleHashChange)
@@ -89,6 +90,7 @@ function AppContent() {
           />
         )}
         {activeTab === 'accounts' && <AccountsView />}
+        {activeTab === 'transfers' && <TransfersView />}
         {activeTab === 'budgets' && <BudgetsView />}
         {activeTab === 'analytics' && <AnalyticsView />}
         {activeTab === 'settings' && <SettingsView />}

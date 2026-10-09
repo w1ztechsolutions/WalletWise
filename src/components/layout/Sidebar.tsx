@@ -9,12 +9,13 @@ import {
   Settings,
   LogOut,
   X,
+  ArrowLeftRight,
 } from 'lucide-react'
 import { useFinance } from '@/context/FinanceContext'
 import { authClient } from '@/lib/auth-client'
 import { sessionKeys } from '@/hooks/useSession'
 
-export type NavTab = 'dashboard' | 'transactions' | 'accounts' | 'budgets' | 'analytics' | 'settings'
+export type NavTab = 'dashboard' | 'transactions' | 'accounts' | 'transfers' | 'budgets' | 'analytics' | 'settings'
 
 interface SidebarProps {
   isOpen: boolean
@@ -27,6 +28,7 @@ export const NAV_ITEMS: { id: NavTab; label: string; icon: React.ComponentType<{
   { id: 'dashboard',    label: 'Dashboard',    icon: LayoutDashboard },
   { id: 'transactions', label: 'Transactions', icon: Receipt },
   { id: 'accounts',     label: 'Accounts',     icon: WalletCards },
+  { id: 'transfers',    label: 'Transfers',    icon: ArrowLeftRight },
   { id: 'budgets',      label: 'Budgets',      icon: PiggyBank },
   { id: 'analytics',    label: 'Analytics',    icon: BarChart3 },
   { id: 'settings',     label: 'Settings',     icon: Settings },
