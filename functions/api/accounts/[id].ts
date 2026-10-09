@@ -1,6 +1,7 @@
 import { eq, and, sql } from "drizzle-orm";
 import { accounts, transactions, transfers } from "../../../src/db/schema";
 import { createDb, getAuthUser, json, error } from "../../lib/helpers";
+import { MAX_TEXT } from "../../lib/validation";
 import { withErrorHandling } from "../../lib/errors";
 
 interface Env {
@@ -75,6 +76,9 @@ export const onRequestPut: PagesFunction<Env> = withErrorHandling(async (context
 
   if (name !== undefined) {
     if (typeof name !== "string" || !name.trim()) return error("Account name must be a non-empty string.");
+    if (name.trim().length > MAX_TEXT.name) {
+      return error(`Account name must be at most ${MAX_TEXT.name} characters.`);
+    }
     updates.name = name.trim();
   }
   if (type !== undefined) {
@@ -85,6 +89,9 @@ export const onRequestPut: PagesFunction<Env> = withErrorHandling(async (context
   }
   if (institution !== undefined) {
     if (typeof institution !== "string") return error("Institution must be a string.");
+    if (institution.length > MAX_TEXT.institution) {
+      return error(`Institution must be at most ${MAX_TEXT.institution} characters.`);
+    }
     updates.institution = institution;
   }
   if (account_number !== undefined) {
@@ -103,6 +110,9 @@ export const onRequestPut: PagesFunction<Env> = withErrorHandling(async (context
     updates.color = color;
   }
   if (notes !== undefined) {
+    if (typeof notes === "string" && notes.length > MAX_TEXT.notes) {
+      return error(`Notes must be at most ${MAX_TEXT.notes} characters.`);
+    }
     updates.notes = typeof notes === "string" ? notes : null;
   }
   if (is_active !== undefined) {

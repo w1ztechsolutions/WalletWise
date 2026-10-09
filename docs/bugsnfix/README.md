@@ -17,7 +17,7 @@ Each bug is documented in its own individual file following the naming pattern: 
 | BUG-005 | [BUG-005-dead-hooks-and-unwired-backend.md](./BUG-005-dead-hooks-and-unwired-backend.md) | High | ✅ Resolved | 2026-10-02 |
 | BUG-006 | [BUG-006-d1-binding-rename-regression.md](./BUG-006-d1-binding-rename-regression.md) | Critical | ✅ Resolved | 2026-10-02 |
 | BUG-007 | [BUG-007-error-contract-wip-build-break.md](./BUG-007-error-contract-wip-build-break.md) | High | ✅ Resolved | 2026-10-02 |
-| BUG-008 | [2026-10-02-stale-deployment-breaks-production-auth.md](./2026-10-02-stale-deployment-breaks-production-auth.md) | Critical | 🔴 Open — fix committed, redeploy required | 2026-10-02 |
+| BUG-008 | [2026-10-02-stale-deployment-breaks-production-auth.md](./2026-10-02-stale-deployment-breaks-production-auth.md) | Critical | ✅ Resolved | 2026-10-02 |
 | BUG-009 | [2026-10-02-auth-failures-silently-swallowed.md](./2026-10-02-auth-failures-silently-swallowed.md) | High | ✅ Resolved | 2026-10-02 |
 | BUG-010 | [2026-10-02-modal-dialogs-overflow-mobile-viewport.md](./2026-10-02-modal-dialogs-overflow-mobile-viewport.md) | High | ✅ Resolved | 2026-10-02 |
 | BUG-011 | [2026-10-02-signout-leaves-app-shell-mounted.md](./2026-10-02-signout-leaves-app-shell-mounted.md) | High | ✅ Resolved | 2026-10-02 |

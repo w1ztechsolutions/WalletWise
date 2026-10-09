@@ -7,6 +7,24 @@
  * single-create too, and vice versa. Both call the functions below.
  */
 
+import { isOwnedKey, isSafeKeyFormat } from "../../src/lib/storage";
+
+/**
+ * SEC-05 / SECURITY.md §4.1: every write path trims and length-caps free
+ * text. Shared so the single-record endpoints, PUT partial updates, and the
+ * bulk import pipeline cannot drift apart.
+ */
+export const MAX_TEXT = {
+  /** transaction / transfer descriptions */
+  description: 500,
+  /** notes fields (transactions, budgets, accounts, transfers) */
+  notes: 500,
+  /** account / category / budget names and profile display names */
+  name: 255,
+  /** financial institution strings */
+  institution: 255,
+} as const;
+
 export interface ValidatedTransaction {
   date: string;
   amount: number;
@@ -45,6 +63,25 @@ export function validateTransactionRow(
   if (typeof category_name !== "string" || !category_name.trim()) {
     return { ok: false, reason: "Category name is required." };
   }
+  if (category_name.length > MAX_TEXT.name) {
+    return { ok: false, reason: `Category name must be at most ${MAX_TEXT.name} characters.` };
+  }
+  if (description !== undefined && description !== null) {
+    if (typeof description !== "string") {
+      return { ok: false, reason: "Description must be a string." };
+    }
+    if (description.length > MAX_TEXT.description) {
+      return { ok: false, reason: `Description must be at most ${MAX_TEXT.description} characters.` };
+    }
+  }
+  if (notes !== undefined && notes !== null) {
+    if (typeof notes !== "string") {
+      return { ok: false, reason: "Notes must be a string." };
+    }
+    if (notes.length > MAX_TEXT.notes) {
+      return { ok: false, reason: `Notes must be at most ${MAX_TEXT.notes} characters.` };
+    }
+  }
   if (account_id !== undefined && account_id !== null && typeof account_id !== "string") {
     return { ok: false, reason: "Account must be a valid account ID." };
   }
@@ -78,6 +115,17 @@ export function validateBudgetRow(
   }
   if (typeof category_name !== "string" || !category_name.trim()) {
     return { ok: false, reason: "Category name is required." };
+  }
+  if (category_name.length > MAX_TEXT.name) {
+    return { ok: false, reason: `Category name must be at most ${MAX_TEXT.name} characters.` };
+  }
+  if (notes !== undefined && notes !== null) {
+    if (typeof notes !== "string") {
+      return { ok: false, reason: "Notes must be a string." };
+    }
+    if (notes.length > MAX_TEXT.notes) {
+      return { ok: false, reason: `Notes must be at most ${MAX_TEXT.notes} characters.` };
+    }
   }
 
   return {
@@ -118,4 +166,53 @@ export function transactionRowKey(
 /** Duplicate identity for a budget: the existing unique index `(user, month, category)`. */
 export function budgetRowKey(userId: string, row: ValidatedBudget): string {
   return ["bg", userId, row.month, row.category_id ?? ""].join("|");
+}
+
+export interface ValidatedAttachment {
+  key: string | null;
+  name: string | null;
+}
+
+/**
+ * DOC-04: server-side acceptance of a transaction's receipt attachment fields.
+ *
+ * The client echoes `attachment_key` back when creating or editing a
+ * transaction, but the key is an R2 object reference — an untrusted value.
+ * Before it is persisted we require the exact same structural and ownership
+ * rules the storage endpoints enforce (`isSafeKeyFormat` + `isOwnedKey`):
+ * the key must live under this caller's `users/{userId}/receipts/` prefix.
+ * A key belonging to another user is rejected outright (400), never stored —
+ * otherwise a later presign attempt would leak the mismatch as an internal
+ * error instead of a validation failure.
+ *
+ * `attachment_key` absent or `null` clears any stored receipt; callers that
+ * support "leave unchanged" (PUT) must check for `undefined` themselves
+ * before invoking this.
+ */
+export function validateAttachment(
+  row: Record<string, unknown>,
+  userId: string
+): { ok: true; value: ValidatedAttachment } | { ok: false; reason: string } {
+  const { attachment_key, attachment_name } = row;
+
+  if (attachment_key === undefined || attachment_key === null) {
+    return { ok: true, value: { key: null, name: null } };
+  }
+  if (
+    typeof attachment_key !== "string" ||
+    !isSafeKeyFormat(attachment_key) ||
+    !isOwnedKey(attachment_key, userId)
+  ) {
+    return { ok: false, reason: "Invalid attachment reference." };
+  }
+  if (attachment_name !== undefined && attachment_name !== null && typeof attachment_name !== "string") {
+    return { ok: false, reason: "Attachment name must be a string." };
+  }
+  const name =
+    typeof attachment_name === "string" && attachment_name.trim() ? attachment_name.trim() : null;
+  if (name && name.length > MAX_TEXT.name) {
+    return { ok: false, reason: `Attachment name must be at most ${MAX_TEXT.name} characters.` };
+  }
+
+  return { ok: true, value: { key: attachment_key, name } };
 }

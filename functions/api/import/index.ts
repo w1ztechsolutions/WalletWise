@@ -1,6 +1,6 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { transactions, budgets, accounts } from "../../../src/db/schema";
-import { createDb, getAuthUser, json, error } from "../../lib/helpers";
+import { createDb, getAuthUser, json, error, getOwnedCategoryIds } from "../../lib/helpers";
 import { withErrorHandling } from "../../lib/errors";
 import {
   validateTransactionRow,
@@ -131,6 +131,18 @@ export const onRequestPost: PagesFunction<Env> = withErrorHandling(async (contex
   }
 
   // ---- Classify every row once; both modes share this step. ----
+  // SEC-04 — a spreadsheet must not link rows to another user's category id.
+  // One batched ownership query covers every candidate id in the payload.
+  const candidateCategoryIds = [
+    ...new Set(
+      [...rawTransactions, ...rawBudgets]
+        .map((row) => row.category_id)
+        .filter((id): id is string => typeof id === "string" && id.trim().length > 0)
+        .map((id) => id.trim())
+    ),
+  ];
+  const ownedCategoryIds = await getOwnedCategoryIds(context.env, user.id, candidateCategoryIds);
+
   const validTransactions: { row: ValidatedTransaction; key: string }[] = [];
   const validBudgets: { row: ValidatedBudget; key: string }[] = [];
   const invalid: ImportRowError[] = [];
@@ -140,6 +152,8 @@ export const onRequestPost: PagesFunction<Env> = withErrorHandling(async (contex
     if (result.ok) {
       if (result.value.account_id && !ownedAccountIds.has(result.value.account_id)) {
         invalid.push({ row: raw, entity: "transaction", reason: "Linked account not found.", key: "" });
+      } else if (result.value.category_id && !ownedCategoryIds.has(result.value.category_id)) {
+        invalid.push({ row: raw, entity: "transaction", reason: "Linked category not found.", key: "" });
       } else {
         validTransactions.push({ row: result.value, key: transactionRowKey(user.id, result.value) });
       }
@@ -151,7 +165,11 @@ export const onRequestPost: PagesFunction<Env> = withErrorHandling(async (contex
   rawBudgets.forEach((raw) => {
     const result = validateBudgetRow(raw);
     if (result.ok) {
-      validBudgets.push({ row: result.value, key: budgetRowKey(user.id, result.value) });
+      if (result.value.category_id && !ownedCategoryIds.has(result.value.category_id)) {
+        invalid.push({ row: raw, entity: "budget", reason: "Linked category not found.", key: "" });
+      } else {
+        validBudgets.push({ row: result.value, key: budgetRowKey(user.id, result.value) });
+      }
     } else {
       invalid.push({ row: raw, entity: "budget", reason: result.reason, key: "" });
     }

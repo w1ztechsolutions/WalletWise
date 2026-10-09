@@ -1,6 +1,7 @@
 import { eq, and } from "drizzle-orm";
 import { categories, transactions } from "../../../src/db/schema";
 import { createDb, getAuthUser, json, error } from "../../lib/helpers";
+import { MAX_TEXT } from "../../lib/validation";
 import { withErrorHandling } from "../../lib/errors";
 
 interface Env {
@@ -47,6 +48,9 @@ export const onRequestPut: PagesFunction<Env> = withErrorHandling(async (context
 
   if (name !== undefined) {
     if (typeof name !== "string" || !name.trim()) return error("Category name must be a non-empty string.");
+    if (name.trim().length > MAX_TEXT.name) {
+      return error(`Category name must be at most ${MAX_TEXT.name} characters.`);
+    }
     updates.name = name.trim();
   }
   if (type !== undefined) {

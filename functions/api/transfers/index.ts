@@ -1,6 +1,7 @@
 import { eq, and, desc } from "drizzle-orm";
 import { transfers, accounts } from "../../../src/db/schema";
 import { createDb, getAuthUser, json, error } from "../../lib/helpers";
+import { MAX_TEXT } from "../../lib/validation";
 import { withErrorHandling } from "../../lib/errors";
 
 interface Env {
@@ -28,6 +29,22 @@ function validateTransfer(body: Record<string, unknown>): { ok: true; value: { f
   }
   if (typeof date !== "string" || !DATE_RE.test(date)) {
     return { ok: false, reason: "Invalid date. Expected YYYY-MM-DD format." };
+  }
+  if (description !== undefined && description !== null) {
+    if (typeof description !== "string") {
+      return { ok: false, reason: "Description must be a string." };
+    }
+    if (description.length > MAX_TEXT.description) {
+      return { ok: false, reason: `Description must be at most ${MAX_TEXT.description} characters.` };
+    }
+  }
+  if (notes !== undefined && notes !== null) {
+    if (typeof notes !== "string") {
+      return { ok: false, reason: "Notes must be a string." };
+    }
+    if (notes.length > MAX_TEXT.notes) {
+      return { ok: false, reason: `Notes must be at most ${MAX_TEXT.notes} characters.` };
+    }
   }
   return {
     ok: true,

@@ -139,6 +139,17 @@ Record security-relevant events, including authentication failures, authorizatio
 Protect audit logs against unauthorized modification and access.
 Do not record sensitive information merely because it is available.
 Configure monitoring and alerting for suspicious activity and repeated security failures.
+2.8 Documentation Integrity and Repository Records
+Documentation, audit notes, specifications, and planning records are part of the application's security surface: stale or false documentation is a defect, not a cosmetic issue.
+Maintain living audit records (for example `audit.md`) with a header stating the audit date, audited commit, scope, methodology, and an overall verdict; version major rewrites with a dated change log entry and keep the previous record when asked.
+Every status, severity, and verification claim in documentation must match the actual state of the code at the stated commit; re-verify findings against current `main` before leaving them open, and mark stale findings resolved only with cited evidence (file and line reference or an executed command).
+Label every verification claim explicitly as static (code-reading) evidence or as runtime evidence with the executed command; never present a static reading as an executed result, and record unexecuted checks as "Not run" or "Not verified".
+When a finding changes state, update every cross-reference atomically: severity tables, status fields, work orders, checklists, and linked documents, so counts and statuses remain internally consistent across the whole document.
+Separate current state from historical record: retain original evidence under an explicitly labeled section instead of silently rewriting it, and clearly label superseded claims.
+Keep governance documents (root `AGENT.md`, `SECURITY.md`, `audit.md`, rules files) at the repository root; place per-task or per-feature records under `docs/`.
+Never record unverified claims, fabricated test results, invented command output, or invented evidence in any document, and never place secrets, tokens, credentials, or sensitive personal data in documentation or commit messages.
+Before completing a documentation task, diff the affected files, verify no unrelated sections were altered, and confirm the document reads correctly from top to bottom.
+
 3. Dependency and Software Supply-Chain Integrity
 
 Before adding, upgrading, or replacing a dependency:

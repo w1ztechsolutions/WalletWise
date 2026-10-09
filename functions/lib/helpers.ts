@@ -1,7 +1,7 @@
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { createAuth } from "../../src/lib/auth";
-import { user } from "../../src/db/schema";
+import { categories, user } from "../../src/db/schema";
 import { ApiError } from "./errors";
 
 export interface AuthUser {
@@ -60,4 +60,30 @@ export function json(data: unknown, status = 200): Response {
  */
 export function error(message: string, status = 400): Response {
   return ApiError.fromStatus(status, message).toResponse();
+}
+
+/**
+ * SEC-04: returns which of `categoryIds` actually belong to `userId`.
+ *
+ * Mirrors the per-row `account_id` ownership lookups in the transaction and
+ * transfer handlers, but batches so the import pipeline can check a whole
+ * spreadsheet with a single query instead of N. Call sites must treat a
+ * foreign id exactly like a missing one and answer `404` (SECURITY.md §2
+ * anti-enumeration: existence of another user's category id is never
+ * confirmed).
+ */
+export async function getOwnedCategoryIds(
+  env: { DB: D1Database },
+  userId: string,
+  categoryIds: string[]
+): Promise<Set<string>> {
+  const unique = [...new Set(categoryIds)];
+  if (unique.length === 0) return new Set();
+
+  const db = drizzle(env.DB);
+  const rows = await db
+    .select({ id: categories.id })
+    .from(categories)
+    .where(and(eq(categories.created_by_id, userId), inArray(categories.id, unique)));
+  return new Set(rows.map((row) => row.id));
 }

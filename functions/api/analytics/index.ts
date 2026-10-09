@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { transactions, budgets } from "../../../src/db/schema";
 import { createDb, getAuthUser, json, error } from "../../lib/helpers";
 import { withErrorHandling } from "../../lib/errors";
@@ -72,13 +72,21 @@ export const onRequestGet: PagesFunction<Env> = withErrorHandling(async (context
         .select({ total: sql`COALESCE(SUM(${transactions.amount}), 0)` })
         .from(transactions)
         .where(
-          sql`${transactions.created_by_id} = ${user.id} AND ${transactions.type} = 'income' AND substr(${transactions.date}, 1, 7) = ${currentMonth}`
+          and(
+            eq(transactions.created_by_id, user.id),
+            eq(transactions.type, "income"),
+            sql`substr(${transactions.date}, 1, 7) = ${currentMonth}`
+          )
         ),
       db
         .select({ total: sql`COALESCE(SUM(${transactions.amount}), 0)` })
         .from(transactions)
         .where(
-          sql`${transactions.created_by_id} = ${user.id} AND ${transactions.type} = 'expense' AND substr(${transactions.date}, 1, 7) = ${currentMonth}`
+          and(
+            eq(transactions.created_by_id, user.id),
+            eq(transactions.type, "expense"),
+            sql`substr(${transactions.date}, 1, 7) = ${currentMonth}`
+          )
         ),
     ]);
 
@@ -89,16 +97,14 @@ export const onRequestGet: PagesFunction<Env> = withErrorHandling(async (context
     const monthBudgets = await db
       .select()
       .from(budgets)
-      .where(
-        sql`${budgets.created_by_id} = ${user.id} AND ${budgets.month} = ${currentMonth}`
-      );
+      .where(and(eq(budgets.created_by_id, user.id), eq(budgets.month, currentMonth)));
 
     // Recent transactions
     const recentTransactions = await db
       .select()
       .from(transactions)
       .where(eq(transactions.created_by_id, user.id))
-      .orderBy(sql`${transactions.date} DESC`)
+      .orderBy(desc(transactions.date))
       .limit(5);
 
     // Spending by category for current month
@@ -109,7 +115,11 @@ export const onRequestGet: PagesFunction<Env> = withErrorHandling(async (context
       })
       .from(transactions)
       .where(
-        sql`${transactions.created_by_id} = ${user.id} AND ${transactions.type} = 'expense' AND substr(${transactions.date}, 1, 7) = ${currentMonth}`
+        and(
+          eq(transactions.created_by_id, user.id),
+          eq(transactions.type, "expense"),
+          sql`substr(${transactions.date}, 1, 7) = ${currentMonth}`
+        )
       )
       .groupBy(transactions.category_name);
 
@@ -157,18 +167,25 @@ export const onRequestGet: PagesFunction<Env> = withErrorHandling(async (context
   if (view === "all-time") {
     const { start, end } = resolveMonths();
     const hasRange = Boolean(start && end);
-    const rangeExpr = hasRange
-      ? sql` AND substr(${transactions.date}, 1, 7) BETWEEN ${start} AND ${end}`
-      : sql``;
+    // Builder-based scope: identity/typed filters are eq() terms; only the
+    // date-window predicate (parameterized, MONTH_RE-validated inputs) stays
+    // a sql fragment.
+    const scopeFor = (type: "income" | "expense") => {
+      const conditions = [eq(transactions.created_by_id, user.id), eq(transactions.type, type)];
+      if (hasRange) {
+        conditions.push(sql`substr(${transactions.date}, 1, 7) BETWEEN ${start} AND ${end}`);
+      }
+      return and(...conditions);
+    };
     const [incomeResult, expenseResult] = await Promise.all([
       db
         .select({ total: sql`COALESCE(SUM(${transactions.amount}), 0)` })
         .from(transactions)
-        .where(sql`${transactions.created_by_id} = ${user.id} AND ${transactions.type} = 'income'${rangeExpr}`),
+        .where(scopeFor("income")),
       db
         .select({ total: sql`COALESCE(SUM(${transactions.amount}), 0)` })
         .from(transactions)
-        .where(sql`${transactions.created_by_id} = ${user.id} AND ${transactions.type} = 'expense'${rangeExpr}`),
+        .where(scopeFor("expense")),
     ]);
 
     const totalIncome = Number(incomeResult[0]?.total ?? 0);
@@ -180,9 +197,9 @@ export const onRequestGet: PagesFunction<Env> = withErrorHandling(async (context
         total: sql`COALESCE(SUM(${transactions.amount}), 0)`,
       })
       .from(transactions)
-      .where(sql`${transactions.created_by_id} = ${user.id} AND ${transactions.type} = 'expense'${rangeExpr}`)
+      .where(scopeFor("expense"))
       .groupBy(transactions.category_name)
-      .orderBy(sql`SUM(${transactions.amount}) DESC`)
+      .orderBy(desc(sql`SUM(${transactions.amount})`))
       .limit(5);
 
     return json({

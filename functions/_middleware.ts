@@ -1,5 +1,10 @@
 import { createAuth } from "../src/lib/auth";
 import { handleUnexpectedError } from "./lib/errors";
+import {
+  consumeRateLimit,
+  rateLimitedResponse,
+  type RateLimitBucket,
+} from "./lib/rate-limit";
 
 interface Env {
   DB: D1Database;
@@ -41,6 +46,41 @@ function isMutation(method: string): boolean {
 }
 
 /**
+ * Trustworthy client address for IP-keyed buckets. Cloudflare sets this
+ * header at the edge; local dev has none, so all local traffic shares one
+ * bucket (harmless during development).
+ */
+function clientIp(request: Request): string {
+  return request.headers.get("cf-connecting-ip")?.trim() || "local";
+}
+
+/**
+ * SEC-06 — layered application rate limiting, checked before session or
+ * database work so floods are bounded at the cheapest point:
+ *
+ *  1. `edge` — per-IP cover for every /api/ request, anonymous included.
+ *  2. `auth` — per-IP cap on credential mutations (sign-in/sign-up/etc).
+ *  3. per-user class buckets (`ai`/`import`/`storage`/`api`) applied once
+ *     the session is known, bounding the expensive paths per account.
+ *
+ * Counters are per-isolate (see `rate-limit.ts`); a global WAF
+ * rate-limiting rule remains the recommended outer layer. Denials answer
+ * `429` + `Retry-After` with the shared `RATE_LIMITED` code.
+ */
+function rateLimit(bucket: RateLimitBucket, identity: string): Response | null {
+  const result = consumeRateLimit(bucket, identity);
+  return result.allowed ? null : rateLimitedResponse(result.retryAfterSeconds);
+}
+
+/** Maps an authenticated API path to its per-user bucket. */
+function classifyApiRequest(pathname: string): RateLimitBucket {
+  if (pathname.startsWith("/api/ai/")) return "ai";
+  if (pathname.startsWith("/api/import")) return "import";
+  if (pathname.startsWith("/api/storage/")) return "storage";
+  return "api";
+}
+
+/**
  * Guards `context.next()` and reports anything it throws.
  *
  * Pages Functions middleware exposes no `onError` export, so an unguarded
@@ -59,10 +99,23 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   context.data.requestId = crypto.randomUUID();
 
+  // Layer 1 — per-IP flood cover across the whole API surface, before any
+  // session lookup, so anonymous floods are bounded too.
+  const isApiPath = pathname === "/api" || pathname.startsWith(API_PATH_PREFIX);
+  if (isApiPath) {
+    const limited = rateLimit("edge", clientIp(context.request));
+    if (limited) return limited;
+  }
+
   try {
     // Auth routes handle their own session lifecycle. Keep sign-out available,
     // but prevent authenticated account changes during the recovery window.
     if (pathname === "/api/auth" || pathname.startsWith(AUTH_PATH_PREFIX)) {
+      // Layer 2 — credential attempts are the most abusable mutations here.
+      if (isMutation(context.request.method)) {
+        const limited = rateLimit("auth", clientIp(context.request));
+        if (limited) return limited;
+      }
       if (isMutation(context.request.method) && pathname !== `${AUTH_PATH_PREFIX}/sign-out`) {
         const auth = createAuth(context.env.DB);
         const session = await auth.api.getSession({ headers: context.request.headers });
@@ -96,6 +149,10 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       // Inject the authenticated user id so downstream handlers
       // (storage, AI parser, CRUD endpoints) can scope every operation.
       context.data.userId = session.user.id;
+
+      // Layer 3 — per-user caps by expense class.
+      const limited = rateLimit(classifyApiRequest(pathname), session.user.id);
+      if (limited) return limited;
 
       if (
         isMutation(context.request.method) &&

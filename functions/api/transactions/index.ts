@@ -1,7 +1,7 @@
-import { eq, and, like, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { transactions, accounts } from "../../../src/db/schema";
-import { createDb, getAuthUser, json, error } from "../../lib/helpers";
-import { validateTransactionRow } from "../../lib/validation";
+import { createDb, getAuthUser, json, error, getOwnedCategoryIds } from "../../lib/helpers";
+import { validateTransactionRow, validateAttachment } from "../../lib/validation";
 import { withErrorHandling } from "../../lib/errors";
 
 interface Env {
@@ -9,6 +9,15 @@ interface Env {
   STORAGE: R2Bucket;
   AI: Ai;
   ENVIRONMENT?: string;
+}
+
+/**
+ * SEC-06 — escapes LIKE wildcards in untrusted filter input so the value
+ * matches literally instead of acting as a pattern. Always paired with
+ * `ESCAPE '\'` at the call site.
+ */
+function escapeLikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, (ch) => `\\${ch}`);
 }
 
 export const onRequestGet: PagesFunction<Env> = withErrorHandling(async (context) => {
@@ -31,10 +40,12 @@ export const onRequestGet: PagesFunction<Env> = withErrorHandling(async (context
     conditions.push(eq(transactions.category_id, categoryId));
   }
   if (month) {
-    conditions.push(like(transactions.date, `${month}%`));
+    conditions.push(sql`${transactions.date} LIKE ${escapeLikePattern(month) + "%"} ESCAPE '\\'`);
   }
   if (search) {
-    conditions.push(like(transactions.description, `%${search}%`));
+    conditions.push(
+      sql`${transactions.description} LIKE ${"%" + escapeLikePattern(search) + "%"} ESCAPE '\\'`
+    );
   }
 
   const whereClause = conditions.length === 1 ? conditions[0] : and(...conditions);
@@ -72,6 +83,21 @@ export const onRequestPost: PagesFunction<Env> = withErrorHandling(async (contex
       .limit(1);
     if (!ownedAccount) return error("Account not found.", 404);
   }
+  // SEC-04 — category references are as untrusted as account references;
+  // a foreign id must look exactly like a missing one (404, no enumeration).
+  if (validated.value.category_id) {
+    const ownedCategories = await getOwnedCategoryIds(context.env, user.id, [
+      validated.value.category_id,
+    ]);
+    if (!ownedCategories.has(validated.value.category_id)) {
+      return error("Category not found.", 404);
+    }
+  }
+  // DOC-04 — persist receipt attachment fields only after the same
+  // structural + ownership checks the storage endpoints enforce.
+  const attachment = validateAttachment(body, user.id);
+  if (!attachment.ok) return error(attachment.reason);
+
   const id = crypto.randomUUID();
 
   const result = await db
@@ -88,6 +114,8 @@ export const onRequestPost: PagesFunction<Env> = withErrorHandling(async (contex
       type: validated.value.type,
       is_recurring: validated.value.is_recurring,
       notes: validated.value.notes,
+      attachment_key: attachment.value.key,
+      attachment_name: attachment.value.name,
     })
     .returning();
 

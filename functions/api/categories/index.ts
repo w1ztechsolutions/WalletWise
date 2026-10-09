@@ -1,6 +1,7 @@
 import { eq, and } from "drizzle-orm";
 import { categories, transactions } from "../../../src/db/schema";
 import { createDb, getAuthUser, json, error } from "../../lib/helpers";
+import { MAX_TEXT } from "../../lib/validation";
 import { withErrorHandling } from "../../lib/errors";
 
 interface Env {
@@ -45,6 +46,9 @@ export const onRequestPost: PagesFunction<Env> = withErrorHandling(async (contex
 
   if (typeof name !== "string" || !name.trim()) {
     return error("Category name is required.");
+  }
+  if (name.trim().length > MAX_TEXT.name) {
+    return error(`Category name must be at most ${MAX_TEXT.name} characters.`);
   }
   if (typeof type !== "string" || !["income", "expense"].includes(type)) {
     return error("Type must be 'income' or 'expense'.");

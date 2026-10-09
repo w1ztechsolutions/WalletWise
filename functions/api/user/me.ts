@@ -4,6 +4,7 @@ import { user } from "../../../src/db/schema";
 import { createAuth } from "../../../src/lib/auth";
 import { json, error } from "../../lib/helpers";
 import { withErrorHandling } from "../../lib/errors";
+import { MAX_TEXT } from "../../lib/validation";
 
 interface Env {
   DB: D1Database;
@@ -52,11 +53,16 @@ export const onRequestPatch: PagesFunction<Env> = withErrorHandling(async (conte
     return error("Invalid JSON body");
   }
 
-  const updates: Record<string, unknown> = {};
+  // Literal-typed so the Drizzle update below can never pick up a column
+  // name that was not explicitly allowed here.
+  const updates: Partial<typeof user.$inferInsert> = {};
 
   if (body.name !== undefined) {
     if (typeof body.name !== "string" || !body.name.trim()) {
       return error("Name must be a non-empty string.");
+    }
+    if (body.name.trim().length > MAX_TEXT.name) {
+      return error(`Name must be at most ${MAX_TEXT.name} characters.`);
     }
     updates.name = body.name.trim();
   }
@@ -74,15 +80,11 @@ export const onRequestPatch: PagesFunction<Env> = withErrorHandling(async (conte
     return error("No valid fields to update.");
   }
 
-  const db = (context.env.DB as any);
-  const fields = Object.keys(updates).map((k) => `"${k}" = ?`).join(", ");
-  const values = Object.values(updates);
-  values.push(session.user.id);
-
-  await db
-    .prepare(`UPDATE user SET ${fields} WHERE id = ?`)
-    .bind(...values)
-    .run();
+  // SEC-05 — Drizzle builder: column names come only from the literal-typed
+  // object above, never from request keys, so no SQL is ever assembled from
+  // external input (SECURITY.md §3.1). Values are bound by the driver.
+  const db = drizzle(context.env.DB);
+  await db.update(user).set(updates).where(eq(user.id, session.user.id));
 
   // Re-fetch the updated user
   const updated = await auth.api.getSession({

@@ -1,6 +1,7 @@
 import { eq, and } from "drizzle-orm";
 import { transfers, accounts } from "../../../src/db/schema";
 import { createDb, getAuthUser, json, error } from "../../lib/helpers";
+import { MAX_TEXT } from "../../lib/validation";
 import { withErrorHandling } from "../../lib/errors";
 
 interface Env {
@@ -90,9 +91,15 @@ export const onRequestPut: PagesFunction<Env> = withErrorHandling(async (context
   }
   if (body.description !== undefined) {
     if (typeof body.description !== "string") return error("Description must be a string.");
+    if (body.description.length > MAX_TEXT.description) {
+      return error(`Description must be at most ${MAX_TEXT.description} characters.`);
+    }
     updates.description = body.description;
   }
   if (body.notes !== undefined) {
+    if (typeof body.notes === "string" && body.notes.length > MAX_TEXT.notes) {
+      return error(`Notes must be at most ${MAX_TEXT.notes} characters.`);
+    }
     updates.notes = typeof body.notes === "string" ? body.notes : null;
   }
 

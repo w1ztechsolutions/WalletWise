@@ -1,6 +1,7 @@
 import { eq, and } from "drizzle-orm";
 import { transactions, accounts } from "../../../src/db/schema";
-import { createDb, getAuthUser, json, error } from "../../lib/helpers";
+import { createDb, getAuthUser, json, error, getOwnedCategoryIds } from "../../lib/helpers";
+import { MAX_TEXT, validateAttachment } from "../../lib/validation";
 import { withErrorHandling } from "../../lib/errors";
 
 interface Env {
@@ -52,17 +53,26 @@ export const onRequestPut: PagesFunction<Env> = withErrorHandling(async (context
     updates.date = date;
   }
   if (amount !== undefined) {
-    if (typeof amount !== "number" || amount <= 0) {
+    if (typeof amount !== "number" || !Number.isFinite(amount) || amount <= 0) {
       return error("Amount must be a positive number.");
     }
     updates.amount = amount;
   }
   if (description !== undefined) {
     if (typeof description !== "string") return error("Description must be a string.");
+    if (description.length > MAX_TEXT.description) {
+      return error(`Description must be at most ${MAX_TEXT.description} characters.`);
+    }
     updates.description = description;
   }
   if (category_id !== undefined) {
-    updates.category_id = typeof category_id === "string" ? category_id : null;
+    const categoryId = typeof category_id === "string" ? category_id : null;
+    if (categoryId) {
+      // SEC-04 — mirror the account_id ownership check; foreign ids answer 404.
+      const ownedCategories = await getOwnedCategoryIds(context.env, user.id, [categoryId]);
+      if (!ownedCategories.has(categoryId)) return error("Category not found.", 404);
+    }
+    updates.category_id = categoryId;
   }
   if (body.account_id !== undefined) {
     if (body.account_id !== null && typeof body.account_id !== "string") {
@@ -84,6 +94,9 @@ export const onRequestPut: PagesFunction<Env> = withErrorHandling(async (context
     if (typeof category_name !== "string" || !category_name.trim()) {
       return error("Category name must be a non-empty string.");
     }
+    if (category_name.length > MAX_TEXT.name) {
+      return error(`Category name must be at most ${MAX_TEXT.name} characters.`);
+    }
     updates.category_name = category_name.trim();
   }
   if (type !== undefined) {
@@ -97,7 +110,18 @@ export const onRequestPut: PagesFunction<Env> = withErrorHandling(async (context
     updates.is_recurring = is_recurring;
   }
   if (notes !== undefined) {
+    if (typeof notes === "string" && notes.length > MAX_TEXT.notes) {
+      return error(`Notes must be at most ${MAX_TEXT.notes} characters.`);
+    }
     updates.notes = typeof notes === "string" ? notes : null;
+  }
+  if (body.attachment_key !== undefined) {
+    // DOC-04 — persist receipt fields only when they pass ownership checks;
+    // `undefined` leaves the stored attachment untouched, `null` clears it.
+    const attachment = validateAttachment(body, user.id);
+    if (!attachment.ok) return error(attachment.reason);
+    updates.attachment_key = attachment.value.key;
+    updates.attachment_name = attachment.value.name;
   }
 
   if (Object.keys(updates).length === 0) {

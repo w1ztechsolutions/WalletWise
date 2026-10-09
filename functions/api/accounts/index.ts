@@ -1,6 +1,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import { accounts, transactions, transfers } from "../../../src/db/schema";
 import { createDb, getAuthUser, json, error } from "../../lib/helpers";
+import { MAX_TEXT } from "../../lib/validation";
 import { withErrorHandling } from "../../lib/errors";
 
 interface Env {
@@ -68,8 +69,17 @@ export const onRequestPost: PagesFunction<Env> = withErrorHandling(async (contex
   if (typeof name !== "string" || !name.trim()) {
     return error("Account name is required.");
   }
+  if (name.trim().length > MAX_TEXT.name) {
+    return error(`Account name must be at most ${MAX_TEXT.name} characters.`);
+  }
   if (typeof type !== "string" || !["cash", "bank", "mobile_wallet"].includes(type)) {
     return error("Type must be 'cash', 'bank', or 'mobile_wallet'.");
+  }
+  if (typeof institution === "string" && institution.length > MAX_TEXT.institution) {
+    return error(`Institution must be at most ${MAX_TEXT.institution} characters.`);
+  }
+  if (typeof notes === "string" && notes.length > MAX_TEXT.notes) {
+    return error(`Notes must be at most ${MAX_TEXT.notes} characters.`);
   }
   if (typeof openingBalance !== "number" || !Number.isFinite(openingBalance)) {
     return error("Opening balance must be a valid number.");

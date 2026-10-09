@@ -1,6 +1,6 @@
 import { eq, and, desc, sql } from "drizzle-orm";
 import { budgets } from "../../../src/db/schema";
-import { createDb, getAuthUser, json, error } from "../../lib/helpers";
+import { createDb, getAuthUser, json, error, getOwnedCategoryIds } from "../../lib/helpers";
 import { validateBudgetRow } from "../../lib/validation";
 import { withErrorHandling } from "../../lib/errors";
 
@@ -53,6 +53,13 @@ export const onRequestPost: PagesFunction<Env> = withErrorHandling(async (contex
   const row = validated.value;
 
   const db = createDb(context.env);
+
+  // SEC-04 — category references are as untrusted as account references;
+  // a foreign id answers 404 exactly like a missing one (no enumeration).
+  if (row.category_id) {
+    const ownedCategories = await getOwnedCategoryIds(context.env, user.id, [row.category_id]);
+    if (!ownedCategories.has(row.category_id)) return error("Category not found.", 404);
+  }
 
   // Check for duplicate — also enforced by `budget_user_month_category_idx`, but
   // checking first lets us return a readable 409 instead of a raw constraint

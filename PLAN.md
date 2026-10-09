@@ -5,6 +5,7 @@
 WalletWise is a modern, responsive personal finance management web application engineered for zero-cost, serverless deployment on the **Cloudflare Developer Platform**.
 
 ### Core Stack
+
 - **Frontend:** React 19 (or 18), Vite, TypeScript, Tailwind CSS, Lucide React icons, and shadcn/ui design conventions.
 - **Routing & State:** TanStack React Query for user-scoped cache management and optimistic mutations; client-side routing.
 - **Backend / Edge API:** Cloudflare Workers / Pages Functions handling REST API endpoints.
@@ -30,9 +31,14 @@ WalletWise/
 ├── vite.config.ts                 # Vite build & proxy configuration
 ├── drizzle.config.ts              # Drizzle ORM configuration for D1
 ├── docs/                          # All secondary documentation
-│   ├── adr/                       # Architectural Decision Records (ADR-001, ADR-002...)
+│   ├── adr/                       # Architectural Decision Records (ADR-001 … ADR-006)
 │   │   ├── 001-cloudflare-fullstack-architecture.md
-│   │   └── 002-better-auth-cloudflare-adapter-and-catch-all-routing.md
+│   │   ├── 002-better-auth-cloudflare-adapter-and-catch-all-routing.md
+│   │   ├── 003-environment-aware-typed-api-errors.md
+│   │   ├── 004-date-ranged-analytics-and-transfers.md
+│   │   ├── 004-playwright-e2e-suite-against-deployed-pages.md
+│   │   ├── 005-account-linked-transaction-ledger.md
+│   │   └── 006-account-deletion-recovery-and-purge.md
 │   ├── bugsnfix/                  # Bug reports, incident logs, root causes, and fixes
 │   │   ├── README.md              # Bug index (authoritative list)
 │   │   └── BUG-0XX-*.md           # One file per bug, indexed in README.md
@@ -49,8 +55,7 @@ WalletWise/
 │   │   ├── analytics/             # Charts, monthly trends, spending breakdown
 │   │   └── settings/              # Category management, Excel import modal, CSV export
 │   ├── db/                        # Drizzle schema, migrations, and D1 connection
-│   │   ├── schema.ts              # Categories, Transactions, Budgets, Accounts, Auth tables
-│   │   └── index.ts
+│   │   └── schema.ts              # Categories, Transactions, Budgets, Accounts, Auth tables
 │   ├── hooks/                     # Custom React hooks (useAuth, useTransactions, useAccounts, etc.)
 │   ├── lib/                       # Utilities (currency formatting, date helpers, cn classnames)
 │   ├── types/                     # TypeScript definitions
@@ -127,6 +132,7 @@ All records automatically include `id`, `created_date`, `updated_date`, and `cre
 ## 4. Phase-by-Phase Roadmap
 
 ### Phase 1: Environment Setup, Documentation & Foundation
+
 - [x] Create `PLAN.md`, `AGENT.md`, `SECURITY.md`.
 - [x] Create `docs/adr/001-cloudflare-fullstack-architecture.md` and `docs/bugsnfix/README.md`.
 - [x] Initialize Vite + React + TypeScript + Tailwind CSS in workspace root.
@@ -135,11 +141,13 @@ All records automatically include `id`, `created_date`, `updated_date`, and `cre
 - [x] Configure Tailwind CSS design tokens (soft blue-grey background, indigo/violet primary, semantic colors).
 
 ### Phase 2: Database Schema, Migrations & Local D1 Emulation
+
 - [x] Define Drizzle schema for categories, transactions, budgets, accounts, and auth.
 - [x] Generated initial SQL migration (`drizzle/0000_glorious_franklin_richards.sql`).
 - [x] Seed default categories and initial lively multi-user demo data.
 
 ### Phase 3: Core UI Shell & Design System
+
 - [x] Implement responsive Layout shell:
   - Top header with hamburger button and page title.
   - Slide-in sidebar (with dark overlay) displaying app title, user info, navigation links, and Sign Out button.
@@ -148,6 +156,7 @@ All records automatically include `id`, `created_date`, `updated_date`, and `cre
 - [x] Implement reusable components: Modal dialogs, buttons, inputs, tabs, stat cards, progress bars, toast notifications.
 
 ### Phase 4: Feature Modules
+
 - [x] **Dashboard (`/`):**
   - Current month stat cards (Net Balance, Income, Expenses, Budget Score 0–100).
   - Spending by category donut chart.
@@ -178,6 +187,7 @@ All records automatically include `id`, `created_date`, `updated_date`, and `cre
   - Transaction export reports (CSV / JSON) with inclusive date-range and type filters.
 
 ### Phase 5: Testing, Local Verification & Deployment
+
 - [x] Build validation (`npm run build` passes with zero errors).
 - [x] Local server running at `http://127.0.0.1:5173/` (HTTP 200 OK verified).
 - [x] Git repository initialized and commits recorded.
@@ -187,23 +197,27 @@ All records automatically include `id`, `created_date`, `updated_date`, and `cre
 ### Phase 6: Cloudflare Fullstack Backend Implementation
 
 #### Phase 0: Frontend Quick Fixes
+
 - [x] Fix `ToastContainer` prop mismatch: rename `message` → `description` in `Toast.tsx` and remove conflicting 5s `useEffect` timer from component. Context's 4s `setTimeout` is now the single dismissal authority.
 - [x] ~~Gate demo seed data (`transactions`, `budgets`, `accounts`) behind `import.meta.env.DEV` in `FinanceContext.tsx` so production starts empty while preserving `localStorage` reads when present.~~ **Superseded:** `FinanceContext.tsx` no longer contains demo seed data or any `localStorage` access — it is now toasts + session-derived `currentUser` only. All views read from D1 via React Query. See `BUG-005`.
 - [x] Verify feature-view styling (`TransactionsView`, `BudgetsView`, `AnalyticsView`, `SettingsView`, `AccountsView`) already uses CSS tokens (`bg-surface`, `text-platinum`, `border-hairline`); no mechanical refactor required.
 
 #### Phase 1: Currency Preference (Data Model)
+
 - [x] Update `formatCurrency` default from `'ZMW'` to `'MWK'` in `src/lib/utils.ts`.
 - [x] Extend `User` type with `currency?: string` in `src/types/index.ts`.
 - [x] Add `currency: text('currency').notNull().default('MWK')` to Better Auth `user` table in `src/db/schema.ts`.
 - [ ] Add Preferences sub-tab and currency dropdown in `SettingsView.tsx`; persist via `PATCH /api/user/me`. **Still outstanding — now unblocked:** the API layer exists (`/api/user/me` GET/PATCH) and `useUser.ts` exports `useUpdateUser()`, but the dropdown UI is not built and `useUpdateUser` has no consumer. Currency is currently read-only in the UI via `useCurrency()` and threaded through every `formatCurrency` call.
 
 #### Phase 2: Better Auth on Cloudflare D1
+
 - [x] Install `better-auth` and `better-auth-cloudflare`. **Corrected:** the planned `@better-auth/d1-adapter` was **not** used — the existing Drizzle instance is passed through `better-auth-cloudflare`'s `withCloudflare` so the auth and application tables share one schema. Rationale in `ADR-002`.
 - [x] Create `src/lib/auth.ts` with the D1/Drizzle adapter, email/password provider, and `user.currency` inclusion. (`geolocationTracking: false` — the `session` table has no geolocation columns; IP detection via `cf-connecting-ip` / `x-real-ip`.)
 - [x] Create `functions/api/auth/[[all]].ts` mount point. Catch-all is `[[all]].ts`, **not** `[[...all]].ts` — wrangler rejects bracket-dots in parameter names.
 - [x] Create `functions/_middleware.ts` to verify session cookies and inject `userId`; reject unauthenticated requests with `401`. Verified: signed-out `GET /api/transactions` returns `401`.
 
 #### Phase 3: Workers CRUD API Layer
+
 - [x] Implement transactions, accounts, budgets, categories, and user endpoints under `functions/api/`.
 - [x] Enforce strict `created_by_id` scoping, input validation, and sanitized error responses. Shared validators and the duplicate-identity keys live in `functions/lib/validation.ts`; the budget unique-index violation is mapped to `409`.
 
@@ -222,7 +236,7 @@ All records automatically include `id`, `created_date`, `updated_date`, and `cre
 - [x] Wire Workers AI (`@cf/meta/llama-3.3-70b-instruct-fp8-fast`) to normalize uploaded spreadsheets into transactions/budgets. **Previously overclaimed** for the same reason as Phase 5 — the parse call was proven at the endpoint level only. Corrected status: the parser is proven live, and the UI now reaches it behind a real session, but AI output reaching the import review modal has been exercised via the deterministic/API path rather than a browser upload of a messy sheet.
 
 #### Phase 7: Migrations, Testing, and Deploy
-- [ ] Run `drizzle-kit generate` and apply migrations (`--local` then `--remote`). **Partially done:** migrations are generated and `--local` is applied (`No migrations to apply!`). `--remote` requires a real D1 database ID.
+- [ ] Run `drizzle-kit generate` and apply migrations (`--local` then `--remote`). **Local done:** migrations are generated and `--local` is current — re-verified 2026-10-09 (`No migrations to apply!`, including `0003_nonstop_gadget.sql`). **Remote:** `0002` was applied and verified per `BUG-012`; whether `0003` is applied remotely is **not verified** — run `wrangler d1 migrations list walletwise-db --remote` before relying on the receipt-attachment columns in production.
 - [x] Seed default categories server-side on first signup. Idempotent `databaseHooks.user.create.after` in `src/lib/auth.ts`; a new user is verified to receive exactly 9 categories.
 - [x] Verify locally with `wrangler pages dev dist --compatibility-flag=nodejs_compat`. Verified end to end in a browser: signup → session cookie → reload → authenticated; sign out → gated view; two users see zero cross-user data; create transaction → Dashboard/Analytics update without reload; import duplicate → preview → Replace keeps row id / Skip omits.
 - [ ] Push to GitHub, connect Cloudflare Pages, set production bindings, and apply `wrangler secret put` for required secrets. **Partially unblocked:** `wrangler.jsonc` now carries the real production `database_id` (`e9d133d0-…`) and the correct `DB`/`STORAGE` binding names (see `BUG-006`); remaining work is the Pages connection plus `wrangler secret put` for `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` (`.dev.vars.example` documents all three).
@@ -245,8 +259,8 @@ All records automatically include `id`, `created_date`, `updated_date`, and `cre
 - [x] **Fix `BUG-009`** — `AuthView` never surfaced credential failures because Better Auth's client resolves with `{ data, error }` instead of rejecting; `Sidebar.handleSignOut` likewise reported success unconditionally.
 - [x] **Fix `BUG-010`** — modal dialogs had no height cap or overflow, making the transaction form's submit button physically unreachable on a phone. Added `max-h-[90vh] overflow-y-auto` to all four dialog cards.
 - [x] **Fix `BUG-011`** — sign-out left the authenticated shell mounted with a stale session, because `queryClient.clear()` destroys the Query instance `useSession` observes. Now invalidates the session in place and removes the remaining queries by predicate (same fix applied to `AuthGate`'s 401 teardown).
-- [x] Verified: `npx tsc -b` clean, `npm run lint` 0 errors, and **52/52 Playwright specs passing** across `desktop` and `mobile` against `wrangler pages dev`.
-- [ ] **Redeploy production (`BUG-008` — still open).** The live deployment is three commits stale and its D1 `database_id` is still the `local-walletwise-db` placeholder, so sign-up and sign-in return `500` for every visitor. The corrected `wrangler.jsonc` is already on `main`; this needs `npm run build && npx wrangler pages deploy dist --project-name walletwise --branch main`, then a `npm run test:e2e` run against the live URL to confirm.
+- [x] Verified: `npx tsc -b` clean, `npm run lint` 0 errors, and a full Playwright pass across `desktop` and `mobile` against `wrangler pages dev`. **Count provenance (DOC-02):** the recorded "52/52" figure came from a **credentialed** run — without `E2E_EMAIL`/`E2E_PASSWORD` the suite skips its write specs and currently reports **24 passed / 34 skipped** of 58, so pass counts are only comparable when the credential state matches.
+- [x] **Redeploy production (`BUG-008` — resolved).** Re-verified 2026-10-09: the deployed bundle is byte-identical to a fresh build of `main`, `wrangler.jsonc` carries the real production `database_id` (`e9d133d0-…`), and the live site serves the correct typed `401` envelope with sign-up and sign-in working (`BUG-012`). Remaining follow-up: run the credentialed `npm run test:e2e` against the live URL (see `DOC-02` in `audit.md`).
 
 #### Phase 10: Account-Linked Transaction Ledger
 - [x] Add nullable `transactions.account_id` with account deletion setting historical links to `NULL`; preserve existing account balances as `opening_balance` (`ADR-005`).
@@ -254,6 +268,6 @@ All records automatically include `id`, `created_date`, `updated_date`, and `cre
 - [x] Add optional account selection and linked-account labels to manual transaction workflows; refresh account balances after transaction/import writes.
 - [x] Support an optional `Account` spreadsheet column in AI and deterministic parsing, templates, CSV exports, and duplicate review; leave absent or unmatched values unlinked.
 - [x] Add an end-to-end regression covering unlinked transaction behavior, editing a posted transaction to link an account, and balance restoration after deletion.
-- [x] Apply `0002_complex_miracleman.sql` to local D1 and run the full local verification suite (56/56 Playwright tests passed; final ledger/import flows rechecked on desktop and mobile).
+- [x] Apply `0002_complex_miracleman.sql` to local D1 and run the full local verification suite (credentialed run at that commit — see **Count provenance (DOC-02)** under Phase 9; the current suite is 58 tests, **24 passed / 34 skipped** without `E2E_EMAIL`/`E2E_PASSWORD`; final ledger/import flows rechecked on desktop and mobile).
 - [ ] Apply the migration to production D1 and deploy the updated Pages build after production rollout approval.
 
