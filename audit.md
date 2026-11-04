@@ -15,6 +15,22 @@
 >   suite is executed). Gates: `npx tsc -b` exit 0, `npm run lint` 0 errors,
 >   `npx vite build` ✓ 5.23s, Playwright smoke **5/5** vs local. FN-01/FN-02 remain
 >   product decisions.
+> - **v4 (2026-11-04)** — full fresh review of `main` @ `e9a1292` by wallet-agent:
+>   security, code, dependency, documentation, repository-control and **live
+>   deployment** review (v1–v3 reviewed code only, never the path from `main` to
+>   production). New findings: **OPS-01…OPS-05** (delivery & deployment),
+>   **SEC-07…SEC-13**, **DOC-06/DOC-07**, **REPO-01…REPO-03**, recorded in §8.
+>   Re-verified as still holding: per-user scoping on every data handler, the
+>   anonymous 401 envelope, production error sanitization, R2 key ownership and
+>   traversal rejection, zero secrets in tree or history. Measured, not inherited:
+>   `npm ci` ok, `npx tsc -b` exit 0, `npm run lint` 0 errors / 16 warnings,
+>   `npx vite build` ok, `npm audit --omit=dev` 1 high (zod GHSA-mrhx-c7xc-m3w5 via
+>   better-auth), Playwright **62 tests → 24 passed, 38 skipped, exit 0** against
+>   `walletwise-15b.pages.dev`, and **0 GitHub Actions workflows / 0 runs**.
+>   `main` is now protected (force-push and deletion blocked, conversation
+>   resolution required, admin bypass retained). Planned remediation is tracked in
+>   §8.3; the CI gate landed as ADR-007. Production was probed read-only; no
+>   authenticated write path was exercised.
 
 - **Date:** 2026-10-09
 - **Auditor scope:** security-first review of `main` @ `6ec9727`, alignment against
@@ -571,3 +587,83 @@ Stated plainly so these are not mistaken for verified:
 - The rate limiter's per-isolate counters were exercised on a single local
   isolate; cross-isolate behaviour, the `edge` bucket under real `cf-connecting-ip`
   headers, and the recommended WAF rule were not tested.
+
+---
+
+## 8. v4 — Delivery, deployment and repository findings (2026-11-04)
+
+Review of `main` @ `e9a1292`. v1–v3 were code reviews; this pass also covered the
+supply chain, the GitHub controls and the live deployment. Evidence for every row is
+a command or an HTTP probe executed during this pass, listed in the table's
+*Evidence* column. Anything not reproduced is called out in §7.
+
+### 8.1 Severity table (v4)
+
+| Severity | Count | Findings |
+| :-- | :-- | :-- |
+| Critical | 0 | — |
+| High | 3 | OPS-01, OPS-02, SEC-07 |
+| Medium | 6 | SEC-08, SEC-09, SEC-10, SEC-11, DOC-06, OPS-03 |
+| Low | 6 | SEC-12, SEC-13, REPO-01, REPO-02, REPO-03, DOC-07 |
+
+No Critical finding, no cross-user data leak, no unauthenticated data access, no
+committed secret and no injection vector was found in this pass either. The three
+Highs concern **how the app ships**, not how it stores data: addressable by process
+and configuration rather than by rewriting handlers.
+
+### 8.2 Findings
+
+| ID | Sev | Status | Finding | Evidence |
+| :-- | :-- | :-- | :-- | :-- |
+| OPS-01 | High | OPEN — owner decision | `walletwise.pages.dev` is **not** this app. The app answers on `walletwise-15b.pages.dev`; `walletwise.pages.dev` serves an unrelated third-party Astro site ("Walletwiser") with no Functions. `wrangler.jsonc` still declares `name: "walletwise"`, so a config-driven deploy targets a project that is not serving the app. | `GET /api/transactions` → 404 HTML on `.pages.dev`, 401 envelope on `-15b`; `POST /api/auth/sign-in/email` → 405 vs 401; `<title>` comparison. Owner confirmed 2026-11-04 that `walletwise.pages.dev` is not theirs. |
+| OPS-02 | High | **PARTIAL** — CI added in ADR-007, required check pending merge | No CI/CD gates existed: 0 workflows, 0 runs, no `.github/` directory at all, while Pages publishes every push to `main`. `main` is now protected, but a protected branch with no required check gates nothing. | `GET /actions/workflows` → `total_count: 0`; `GET /actions/runs` → `total_count: 0`; branch protection `GET` → 404 before this pass. |
+| SEC-07 | High | OPEN | No `Content-Security-Policy`, no `Strict-Transport-Security`, no `frame-ancestors`/`X-Frame-Options`. `referrer-policy` and `x-content-type-options` are present but appear to be platform-supplied — no `public/_headers` is tracked. | `curl -sI` on both hosts. |
+| SEC-08 | Medium | OPEN | Auth enables email+password only: no email verification, no password reset, no `trustedOrigins`/`baseURL`/`secret` passed explicitly. Any address can be registered and a forgotten password has no recovery path. | `src/lib/auth.ts` config read; live `GET /api/auth/get-session` → 200 `null`. |
+| SEC-09 | Medium | OPEN | Password policy is an 8-character minimum only; no breached-password screening. | `e2e/auth.spec.ts:34` asserts the current rule. |
+| SEC-10 | Medium | OPEN (carries v3 SEC-06 residual) | Rate limits are per-isolate (`functions/lib/rate-limit.ts` says so), there is no WAF rule in front and no per-account lockout, so distributed credential stuffing is not bounded. Anti-enumeration itself is sound. | `consumeRateLimit` module-scope counter map; identical 401 for unknown email and bad password on the live host. |
+| SEC-11 | Medium | OPEN | One high advisory in the production tree: `zod < 4.6.6` (GHSA-mrhx-c7xc-m3w5) via `better-auth@1.7.7` / `better-auth-cloudflare@0.3.1`. `npm audit fix` reports a fix available. | `npm audit --omit=dev` → 1 high; `npm ls zod` → 4.6.5 deduped. |
+| DOC-06 | Medium | OPEN (re-measures DOC-02) | A credentialed-free e2e run exits 0 while skipping most of the suite: **62 tests → 24 passed, 38 skipped, exit 0**. `playwright.config.ts` skips every data-mutating spec without `E2E_EMAIL`/`E2E_PASSWORD` and hardcodes `walletwise-15b.pages.dev` as the target. `PLAN.md` still advertises "52/52" and "56/56". | `npx playwright test` executed twice this pass (browser dependent vs installed Chromium). |
+| OPS-03 | Medium | OPEN | `wrangler.jsonc` `compatibility_date: "2024-11-01"` against a 4.147-era toolchain and `better-auth@1.7.7` — a two-year-old runtime contract. | `wrangler.jsonc`. |
+| SEC-12 | Low | OPEN | The presigned PUT does not bind content type or size: `parseUploadRequest()` validates before signing, but the signature covers only the URL, so the client can PUT other bytes into its own prefix. Private bucket, 15-minute URLs, own prefix only. | `src/lib/storage.ts` `presignR2Url()`; `functions/api/storage/upload-url.ts`. |
+| SEC-13 | Low | OPEN | Session cookie sets `httpOnly`/`sameSite`/`path` but not `secure`; `baseURL`, `secret` and `trustedOrigins` all rely on Better Auth defaults. `.dev.vars.example` never mentions `BETTER_AUTH_SECRET`/`BETTER_AUTH_URL`. | `src/lib/auth.ts` `advanced.cookies`; `.dev.vars.example`. |
+| REPO-01 | Low | OPEN | Public repo still carries the stock "React + TypeScript + Vite" README, has no `LICENSE`, no `CODEOWNERS`, no contributing guide and no issue templates, while issues are enabled. | `git ls-files`, `GET /repos/...` (`license: null`). |
+| REPO-02 | Low | OPEN — owner decision | Internal artefacts are published: `audit.md`, `PLAN.md`, `personal finance.txt`, `.kilo/plans/*`, `build-output.txt`. No secret is exposed, but the known-weak controls and unapplied-migration notes are public. | `git ls-files`. |
+| REPO-03 | Low | OPEN | Secret-scanning extras are off (`secret_scanning_non_provider_patterns`, `secret_scanning_validity_checks`) and `dependabot_security_updates` is disabled. Provider-pattern scanning and push protection are already on. | `GET /repos/...` → `security_and_analysis`. |
+| DOC-07 | Low | OPEN | Duplicate ADR number: `004-date-ranged-analytics-and-transfers.md` and `004-playwright-e2e-suite-against-deployed-pages.md`. | `ls docs/adr`. |
+
+### 8.3 Remediation order (v4 work order)
+
+Each item ships as its own branch + PR with CI green, per ADR-007. Nothing is marked
+RESOLVED until the merged commit is re-probed.
+
+1. **OPS-02** — `.github/workflows/ci.yml` (ADR-007). *In review.* Follow-up after
+   merge: require the `quality` check on `main` and verify a failing branch cannot merge.
+2. **OPS-01** — resolve the deployment identity: attach a custom domain or document
+   `walletwise-15b.pages.dev` as canonical everywhere, and align `wrangler.jsonc`
+   `name`. Needs an owner decision on the domain.
+3. **SEC-07** — `public/_headers` (CSP, HSTS, `frame-ancestors 'none'`,
+   `Permissions-Policy`) + `public/_routes.json` so static assets bypass Functions.
+   Requires post-deploy header probing to prove it.
+4. **SEC-08 / SEC-09 / SEC-13** — email verification, password reset, breached-password
+   check, explicit `secure` cookie, `trustedOrigins`, `baseURL`, and
+   `BETTER_AUTH_SECRET` documented in `.dev.vars.example`.
+5. **SEC-11 / OPS-03** — clear the zod advisory and move `compatibility_date`
+   forward, with a smoke run after deploy.
+6. **SEC-10** — Cloudflare WAF rate-limiting rule on `/api/auth/*` plus a per-account
+   failure counter.
+7. **DOC-06** — make credentialed specs fail (not skip) in CI and delete the stale
+   test counts from `PLAN.md`.
+8. **REPO-01/02/03, DOC-07** — README, LICENSE, CODEOWNERS, issue templates,
+   ADR renumbering, and a decision on which internal docs stay public.
+
+### 8.4 v4 scope limits
+
+- Production was probed **read-only**: no account was created and no authenticated
+  write path was exercised. Authenticated behaviour rests on code reading plus the
+  repo's own suite (24 passing specs).
+- Cloudflare account state was **not** inspected: no API token in the review
+  environment, so WAF rules, Pages project settings, `wrangler d1 migrations list
+  --remote` (still unverified since v2's `0003`) and R2 configuration remain
+  unconfirmed.
+- CSP effectiveness cannot be judged before a candidate policy is deployed.
+- The R2 upload path was verified by code reading only; no live signed-URL round trip.
