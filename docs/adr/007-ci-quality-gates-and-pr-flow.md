@@ -66,9 +66,12 @@ something to invent.
   the API contract is caught only after merge, by the post-merge run plus the smoke
   suite. Testing a PR preview would require the Cloudflare preview-URL API and a
   token in CI; deliberately deferred, and noted here rather than left implicit.
-- CI adds a Node 22 environment that differs from the local Node 24 toolchain. The
-  workflow pins `NODE_VERSION` so the difference is visible and adjustable in one
-  place.
+- CI adds a Node toolchain that must be kept in step by hand. Node is pinned in
+  `.nvmrc` (read by `actions/setup-node`), mirrored by `engines.node` in
+  `package.json`, and must also be set as the Cloudflare Pages build variable
+  `NODE_VERSION`; three places to change, one of them outside the repo. The pin
+  exists because a silent runtime skew between CI and the deploy host is worse
+  than the maintenance cost.
 - GitHub Actions minutes are consumed on a public repo (free tier for public repos).
 
 ## Alternatives considered
@@ -88,6 +91,9 @@ something to invent.
 
 - After merge: enable the required status check on `main` and verify a deliberately
   failing branch cannot merge.
+- Set the Pages project's `NODE_VERSION` build variable to the `.nvmrc` major so the
+  deploy stops relying on the host default, then bump all three pins together on the
+  next LTS (Node 28, October 2027).
 - Add a `preview` job once a Cloudflare API token is available, so PRs are smoke-tested
   against their own Pages preview deployment.
 - Revisit credential-backed e2e in CI (OPS/TEST work order item, `audit.md` DOC-06).

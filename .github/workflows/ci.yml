@@ -32,7 +32,11 @@ permissions:
   contents: read
 
 env:
-  NODE_VERSION: "22"
+  # Node toolchain is pinned by `.nvmrc` (read by actions/setup-node below) so
+  # CI, local dev and the Cloudflare Pages build compile on the same major.
+  # Keep the Pages project's NODE_VERSION build variable in step with it, or the
+  # deploy runs a runtime CI never validated.
+  #
   # Canonical deployed origin. `walletwise.pages.dev` belongs to an unrelated
   # third-party site, so the app is served from the project's own pages.dev host
   # until a custom domain is attached (audit v4, OPS-01).
@@ -46,10 +50,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Node ${{ env.NODE_VERSION }}
+      - name: Set up Node (.nvmrc)
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version-file: .nvmrc
           cache: npm
 
       - name: Install dependencies
@@ -79,10 +83,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Node ${{ env.NODE_VERSION }}
+      - name: Set up Node (.nvmrc)
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version-file: .nvmrc
           cache: npm
 
       - name: Install dependencies
