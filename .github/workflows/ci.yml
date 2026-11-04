@@ -1,0 +1,111 @@
+name: CI
+
+# WalletWise delivery gate.
+#
+# Why this exists: Cloudflare Pages builds every push to `main` and publishes it
+# to users. Before this workflow there was no type check, lint, build or test
+# between a commit and production (audit v4, OPS-02). `main` is protected with
+# force-push and deletion blocked; once this check is required, a red run must
+# be fixed instead of ignored.
+#
+# Two jobs:
+#   quality   — tsc -b, oxlint, vite build. Deterministic, no network needed
+#               beyond the npm registry.
+#   e2e-smoke — the credential-free Playwright smoke project against a deployed
+#               URL (the API auth gate + no-stack-trace contract + asset
+#               integrity). Credentialed specs stay opt-in and are NOT run here:
+#               they write to D1 (see docs/adr/004-playwright-e2e-suite-*).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  # A newer push supersedes an in-flight run for the same ref.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Node toolchain is pinned by `.nvmrc` (read by actions/setup-node below) so
+  # CI, local dev and the Cloudflare Pages build compile on the same major.
+  # Keep the Pages project's NODE_VERSION build variable in step with it, or the
+  # deploy runs a runtime CI never validated.
+  #
+  # Canonical deployed origin. `walletwise.pages.dev` belongs to an unrelated
+  # third-party site, so the app is served from the project's own pages.dev host
+  # until a custom domain is attached (audit v4, OPS-01).
+  E2E_BASE_URL: ${{ vars.E2E_BASE_URL || 'https://walletwise-15b.pages.dev' }}
+
+jobs:
+  quality:
+    name: Type, lint, build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node (.nvmrc)
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc -b
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npx vite build
+
+      - name: Upload build output
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+          retention-days: 7
+
+  e2e-smoke:
+    name: E2E smoke (credential-free)
+    runs-on: ubuntu-latest
+    needs: quality
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node (.nvmrc)
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      # Only the smoke project runs: 5 specs that need no credentials, so the
+      # gate can never go green by skipping everything it meant to assert
+      # (audit v4, DOC-06 — a bare `npm run test:e2e` exits 0 with 38 of 62
+      # specs skipped).
+      - name: Smoke suite
+        run: npx playwright test e2e/smoke.spec.ts --project=desktop
+
+      - name: Upload report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report
+          retention-days: 7
