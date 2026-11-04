@@ -19,7 +19,8 @@
 >   security, code, dependency, documentation, repository-control and **live
 >   deployment** review (v1–v3 reviewed code only, never the path from `main` to
 >   production). New findings: **OPS-01…OPS-05** (delivery & deployment),
->   **SEC-07…SEC-13**, **DOC-06/DOC-07**, **REPO-01…REPO-03**, recorded in §8.
+>   **SEC-07…SEC-13**, **DOC-06/DOC-07**, **DOC-08** (found and fixed in place),
+>   **REPO-01…REPO-03**, recorded in §8.
 >   Re-verified as still holding: per-user scoping on every data handler, the
 >   anonymous 401 envelope, production error sanitization, R2 key ownership and
 >   traversal rejection, zero secrets in tree or history. Measured, not inherited:
@@ -625,11 +626,12 @@ and configuration rather than by rewriting handlers.
 | DOC-06 | Medium | OPEN (re-measures DOC-02) | A credentialed-free e2e run exits 0 while skipping most of the suite: **62 tests → 24 passed, 38 skipped, exit 0**. `playwright.config.ts` skips every data-mutating spec without `E2E_EMAIL`/`E2E_PASSWORD` and hardcodes `walletwise-15b.pages.dev` as the target. `PLAN.md` still advertises "52/52" and "56/56". | `npx playwright test` executed twice this pass (browser dependent vs installed Chromium). |
 | OPS-03 | Medium | OPEN | `wrangler.jsonc` `compatibility_date: "2024-11-01"` against a 4.147-era toolchain and `better-auth@1.7.7` — a two-year-old runtime contract. | `wrangler.jsonc`. |
 | SEC-12 | Low | OPEN | The presigned PUT does not bind content type or size: `parseUploadRequest()` validates before signing, but the signature covers only the URL, so the client can PUT other bytes into its own prefix. Private bucket, 15-minute URLs, own prefix only. | `src/lib/storage.ts` `presignR2Url()`; `functions/api/storage/upload-url.ts`. |
-| SEC-13 | Low | OPEN | Session cookie sets `httpOnly`/`sameSite`/`path` but not `secure`; `baseURL`, `secret` and `trustedOrigins` all rely on Better Auth defaults. `.dev.vars.example` never mentions `BETTER_AUTH_SECRET`/`BETTER_AUTH_URL`. | `src/lib/auth.ts` `advanced.cookies`; `.dev.vars.example`. |
-| REPO-01 | Low | OPEN | Public repo still carries the stock "React + TypeScript + Vite" README, has no `LICENSE`, no `CODEOWNERS`, no contributing guide and no issue templates, while issues are enabled. | `git ls-files`, `GET /repos/...` (`license: null`). |
+| SEC-13 | Low | OPEN | Session cookie sets `httpOnly`/`sameSite`/`path` but not `secure`; `baseURL`, `secret` and `trustedOrigins` all rely on Better Auth defaults. `.dev.vars.example` never mentioned `BETTER_AUTH_SECRET`/`BETTER_AUTH_URL` — **documented 2026-11-04**, the config-level fix is still open. | `src/lib/auth.ts` `advanced.cookies`; `.dev.vars.example`. |
+| REPO-01 | Low | **PARTIAL** — README rewritten for humans, repository description, topics and homepage link set (2026-11-04). `LICENSE`, `CODEOWNERS`, contributing guide and issue templates still open (licence choice is an owner decision). | `git ls-files`, `GET /repos/...` (`license: null`), live README diff. |
 | REPO-02 | Low | OPEN — owner decision | Internal artefacts are published: `audit.md`, `PLAN.md`, `personal finance.txt`, `.kilo/plans/*`, `build-output.txt`. No secret is exposed, but the known-weak controls and unapplied-migration notes are public. | `git ls-files`. |
 | REPO-03 | Low | OPEN | Secret-scanning extras are off (`secret_scanning_non_provider_patterns`, `secret_scanning_validity_checks`) and `dependabot_security_updates` is disabled. Provider-pattern scanning and push protection are already on. | `GET /repos/...` → `security_and_analysis`. |
 | DOC-07 | Low | OPEN | Duplicate ADR number: `004-date-ranged-analytics-and-transfers.md` and `004-playwright-e2e-suite-against-deployed-pages.md`. | `ls docs/adr`. |
+| DOC-08 | Low | **RESOLVED** (2026-11-04) | `.dev.vars.example` declared the `ENVIRONMENT` block twice with contradictory comments, so a reader copying the file could not tell which value won. Rewritten with one block per variable, plus the missing `BETTER_AUTH_SECRET`/`BETTER_AUTH_URL` entries. | File read before fix; `openssl rand -base64 32` generation guidance added. |
 
 ### 8.3 Remediation order (v4 work order)
 
