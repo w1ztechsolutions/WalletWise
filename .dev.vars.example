@@ -3,14 +3,36 @@
 # Copy this file to `.dev.vars` (gitignored) for `wrangler pages dev`.
 # Never commit real credentials.
 #
-# R2 presigned URLs (Phase 6.5) require S3-compatible credentials, because the
-# R2 Workers binding cannot generate signed URLs itself:
-#   1. Cloudflare Dashboard → R2 → (your account) → Manage R2 API Tokens
-#      → Create API token → Object Read & Write, scoped to `walletwise-storage`
+# ---------------------------------------------------------------------------
+# Auth (required for a working local sign-in)
+# ---------------------------------------------------------------------------
+# Better Auth reads these from the environment (see node_modules/better-auth
+# secret-utils). Without BETTER_AUTH_SECRET a local instance signs sessions
+# with a development default, which is unsafe and produces cookies that do not
+# survive a restart. Generate one per machine:
+#
+#   openssl rand -base64 32
+#
+# The same two values must exist in production (Settings → Environment
+# variables and secrets on the Pages project, or `wrangler pages secret put`).
+#
+# Production equivalents:
+#   npx wrangler pages secret put BETTER_AUTH_SECRET
+#   npx wrangler pages secret put BETTER_AUTH_URL
+BETTER_AUTH_SECRET=generate-with-openssl-rand-base64-32
+BETTER_AUTH_URL=http://localhost:8788
+
+# ---------------------------------------------------------------------------
+# R2 presigned URLs (Phase 6.5)
+# ---------------------------------------------------------------------------
+# S3-compatible credentials are required because the R2 Workers binding cannot
+# generate signed URLs itself:
+#   1. Cloudflare Dashboard → R2 → Manage R2 API Tokens → Create API token
+#      → Object Read & Write, scoped to `walletwise-storage`
 #   2. Copy the "Access Key ID" / "Secret Access Key" values below.
 #   3. Your Account ID: Cloudflare Dashboard → right sidebar → Account ID.
 #
-# Production equivalent:
+# Production equivalents:
 #   npx wrangler secret put R2_ACCOUNT_ID
 #   npx wrangler secret put R2_ACCESS_KEY_ID
 #   npx wrangler secret put R2_SECRET_ACCESS_KEY
@@ -19,21 +41,18 @@ R2_ACCOUNT_ID=your-cloudflare-account-id
 R2_ACCESS_KEY_ID=your-r2-access-key-id
 R2_SECRET_ACCESS_KEY=your-r2-secret-access-key
 
-# "development" is the only value that exposes `details` in API error
-# responses (functions/lib/errors.ts). Anything else — including a
-# missing value — fails closed to production-safe output (SECURITY.md §7).
-# Production deployments should leave this unset or set it to "production".
+# ---------------------------------------------------------------------------
+# Error verbosity
+# ---------------------------------------------------------------------------
+# Runtime marker read by `functions/lib/errors.ts`.
+#
+# "development" is the ONLY value that returns `details` (stack traces, D1 error
+# text) in HTTP error responses. Any other value — including a missing binding —
+# is treated as production and stays fully sanitized.
+#
+# This is exactly why you want it in `.dev.vars`: `wrangler pages dev` reads this
+# file and overrides the `"production"` default declared in `wrangler.jsonc`.
 ENVIRONMENT=development
 
 # Optional local override (normally provided by wrangler.jsonc `vars`):
 # R2_BUCKET_NAME=walletwise-storage
-
-# Runtime marker read by `functions/lib/errors.ts`.
-#
-# "development" is the ONLY value that returns `details` (stack traces, D1
-# error text) in HTTP error responses. Any other value — including a missing
-# binding — is treated as production and stays fully sanitized.
-#
-# This is exactly why you want it in `.dev.vars`: `wrangler pages dev` reads
-# this file and overrides the `"production"` default in `wrangler.jsonc`.
-ENVIRONMENT=development
